@@ -4,13 +4,14 @@
 
 ### Import numpy and set random seed for reproducability
 import numpy as np
-np.random.seed(42)
+random_state = 5
+np.random.seed(random_state)
 
 ### Download the dataset using the given code
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 ds = fetch_openml("mnist_784", as_frame=False)
-x, x_test, y, y_test = train_test_split(ds.data, ds.target, test_size=0.2, random_state=42)
+x, x_test, y, y_test = train_test_split(ds.data, ds.target, test_size=0.2, random_state=random_state)
 
 m_non_test = x.shape[0]
 m_test = x_test.shape[0]
@@ -60,11 +61,13 @@ x = x[chosen_indices]
 y = y[chosen_indices]
 
 ### Use train_test_split to split x and y into train and validation sets (80% train, 20% validation)
-x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
+x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=random_state)
 
 ## Part (d)
+### Note to self: For better results, try classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
 from sklearn import svm
 classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'auto')
+print("Variance of X: ", x_train.var())
 
 ### Fit to training data
 classifier.fit(x_train, y_train)

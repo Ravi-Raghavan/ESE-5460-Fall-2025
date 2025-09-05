@@ -1,3 +1,7 @@
+# Ravi Raghavan, Homework #1, Problem 1
+
+## Part (c)
+
 ### Import numpy and set random seed for reproducability
 import numpy as np
 np.random.seed(42)
@@ -8,12 +12,61 @@ from sklearn.model_selection import train_test_split
 ds = fetch_openml("mnist_784", as_frame=False)
 x, x_test, y, y_test = train_test_split(ds.data, ds.target, test_size=0.2, random_state=42)
 
+m_non_test = x.shape[0]
+m_test = x_test.shape[0]
+
+### Get the max/min of x and x_test. Will proceed to convert to uint8
+assert np.max(x) == 255
+assert np.min(x) == 0
+assert np.max(x_test) == 255
+assert np.min(x_test) == 0
+
+### Convert x/x_test to uint8
+x = x.astype('uint8')
+x_test = x_test.astype('uint8')
+
+### Downsample x and x_test from 28 x 28 to 14 x 14
+import cv2
+def downsample_images(images):
+    downsampled_images = []
+    for idx in range(images.shape[0]):
+        flattened_img = images[idx, :].flatten()
+        img_reshaped = flattened_img.reshape(28, 28)
+        img_downsampled = cv2.resize(img_reshaped, (14, 14))
+        downsampled_images.append(img_downsampled.flatten())
+    return np.vstack(downsampled_images)
+
+x = downsample_images(x)
+x_test = downsample_images(x_test)
+
+assert x.shape[0] == m_non_test
+assert x.shape[1] == 14 * 14
+assert x_test.shape[0] == m_test
+assert x_test.shape[1] == 14 * 14
+assert x.ndim == 2
+assert x_test.ndim == 2
+
+### Randomly subsample x to create dataset of size 10000 with 1000 samples per label (subsample y accordingly)
+#### First select the indices that we are going to use for the subsampling
+chosen_indices = []
+for label in np.unique(y):
+    indices = np.where(y == label)[0]
+    selected_indices = np.sort(np.random.choice(indices, size=1000, replace=False)).tolist()
+    chosen_indices.extend(selected_indices)
+
+#### Then, subsample x and y given the above indices 
+chosen_indices = np.array(chosen_indices)
+x = x[chosen_indices]
+y = y[chosen_indices]
+
 ### Use train_test_split to split x and y into train and validation sets (80% train, 20% validation)
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
-
+## Part (d)
+### Note to self: For better results, try classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
 from sklearn import svm
-classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'auto')
+classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
+print("Variance of X: ", x_train.var())
 
 ### Fit to training data
 classifier.fit(x_train, y_train)
@@ -56,3 +109,9 @@ print("Test Error: ", test_error)
 from sklearn.metrics import confusion_matrix
 conf_matrix = confusion_matrix(y_test, y_test_pred)
 print("Confusion Matrix:\n", conf_matrix)
+
+### "Do you notice any patterns about what kind of mistakes are being made?"
+#### Answer: Based on the confusion matrix, it seems that our model is always predicting the class label of '9'
+### " Can you explain these mistakes intuitively?"
+#### Looking at our SVM hyperparameters and Training/Test outputs, we see that we had a large number of support vectors. This is a key indication of overfitting. 
+#### 
