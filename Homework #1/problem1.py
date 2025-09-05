@@ -12,6 +12,9 @@ from sklearn.model_selection import train_test_split
 ds = fetch_openml("mnist_784", as_frame=False)
 x, x_test, y, y_test = train_test_split(ds.data, ds.target, test_size=0.2, random_state=42)
 
+m_non_test = x.shape[0]
+m_test = x_test.shape[0]
+
 ### Get the max/min of x and x_test. Will proceed to convert to uint8
 assert np.max(x) == 255
 assert np.min(x) == 0
@@ -35,6 +38,13 @@ def downsample_images(images):
 
 x = downsample_images(x)
 x_test = downsample_images(x_test)
+
+assert x.shape[0] == m_non_test
+assert x.shape[1] == 14 * 14
+assert x_test.shape[0] == m_test
+assert x_test.shape[1] == 14 * 14
+assert x.ndim == 2
+assert x_test.ndim == 2
 
 ### Randomly subsample x to create dataset of size 10000 with 1000 samples per label (subsample y accordingly)
 #### First select the indices that we are going to use for the subsampling
