@@ -399,3 +399,89 @@ def test_backward_softmax_random_indices():
     check_backward_softmax(indices_h)
     
 test_backward_softmax_random_indices()
+
+### Test embedding_t Function
+def embedding(hl, W, b):
+    # Store Batch Value
+    B = hl.shape[0]
+
+    # We denote dimension of hl as B X 28 X 28 where B is the batch size
+    # Step 1: Convert hl to B X 28 X 28 X 1
+    hl = hl[:, :, :, None]
+
+    # Step 2: Convert hl to B X 28 X 28 X 8
+    hl = np.repeat(hl, repeats = 8, axis = -1)
+
+    # Step 3: Form Sliding Windows: Shape is B x 25 x 25 x 1 x 4 x 4 x 8
+    sliding_windows = np.lib.stride_tricks.sliding_window_view(hl, window_shape = (4, 4, 8), axis = (1, 2, 3))
+    
+    # Step 4: To capture Stride in our convolution, subset windows and we now have B x 7 x 7 x 4 x 4 x 8
+    sliding_windows = sliding_windows[:, ::4, ::4, 0]
+
+    # Step 5: Element-wise multiplication to get output of B x 7 x 7 x 8
+    hl_plus_1 = (sliding_windows * W).sum(axis = (3, 4)) + b
+
+    # Step 6: Convert to B x 392
+    hl_plus_1 = hl_plus_1.reshape(B, -1)
+
+    return hl_plus_1
+
+def check_backward_embedding(t, indices_W, indices_b, indices_h):
+    layer = embedding_t()
+    hl = np.random.randn(1, 28, 28)
+
+    # Compute forward pass
+    layer.forward(hl)
+
+    # Set up backward pass
+    W = layer.w # Shape: 4 x 4 x 8
+    b = layer.b # Shape: (8,)
+
+    # Set up dhl_plus_1
+    dhl_plus_1 = np.zeros(shape = (1, 392))
+    dhl_plus_1[0, t] = 1 # Shape: 1 x 392
+
+    # Compute backward
+    dhl = layer.backward(dhl_plus_1)
+    dw = layer.dw # Shape: 4 x 4 x 8
+    db = layer.db # Shape: (8,)
+
+    # Verify dw
+    for i, j, k in indices_W:
+        eps = np.zeros(shape = W.shape)
+        eps[i, j, k] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_W = (embedding(hl, W + eps, b) - embedding(hl, W - eps, b))[0, t] / (2 * eps)[i, j, k]
+        np.testing.assert_allclose(dw[i, j, k], deriv_W, rtol=1e-6, atol=1e-6)
+    
+    for i in indices_b:
+        eps = np.zeros(shape = b.shape)
+        eps[i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_b = (embedding(hl, W, b + eps) - embedding(hl, W, b - eps))[0, t] / (2 * eps)[i]
+        np.testing.assert_allclose(db[i], deriv_b, rtol=1e-6, atol=1e-6)
+    
+    for i, j in indices_h:
+        eps = np.zeros(shape = hl.shape)
+        eps[0, i, j] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_h = (embedding(hl + eps, W, b) - embedding(hl - eps, W, b))[0, t] / (2 * eps)[0, i, j]
+        np.testing.assert_allclose(dhl[0, i, j], deriv_h, rtol=1e-6, atol=1e-6)
+
+def test_backward_embedding_random_indices():
+    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+
+    # Sample 5 values of k
+    t_values = rng.choice(10, size=5, replace=False)
+
+    for t in t_values:
+        # For W (4 x 4 x 8), pick 10 random (i, j) pairs
+        indices_W = [(rng.integers(0, 4), rng.integers(0, 4), rng.integers(0, 8)) for _ in range(10)]
+        
+        # For b (8,), pick 3 random indices
+        indices_b = rng.choice(8, size=3, replace=False).tolist()
+        
+        # For h (28, 28), pick 4 random indices
+        indices_h = [(rng.integers(0, 28), rng.integers(0, 28)) for _ in range(4)]
+
+        # Run the gradient check for this k
+        check_backward_embedding(t, indices_W, indices_b, indices_h)
+
+test_backward_embedding_random_indices()
