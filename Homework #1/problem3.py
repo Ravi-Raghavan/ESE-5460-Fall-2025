@@ -5,22 +5,21 @@ random_state = 42
 
 ## Part (a)
 
-### Load Data from torchvision
+### Load Data from torchvision using the Code provided by the assignment
 import torchvision as thv
 train = thv.datasets.MNIST("./", download=True, train=True)
 val = thv.datasets.MNIST("./", download=True, train=False)
 print("Part (a): Print out shape of train.data, train.targets, val.data, and val.targets")
-print(train.data.shape, len(train.targets))
-print(val.data.shape, len(val.targets))
+print(train.data.shape, len(train.targets), val.data.shape, len(val.targets))
 
-### Convert everything to numpy. From here on out, NO Torch/Other Deep Learning Library 
+### Convert the above PyTorch Tensors to numpy. From here on out, NO Torch/Other Deep Learning Library 
+### PyTorch will ONLY be used at the VERY END to verify my results
 import numpy as np
-np.random.seed(random_state)
+np.random.seed(random_state) # set random state, throughout the entire problem, for reproducability
 X_train = train.data.numpy()
 y_train = train.targets.numpy()
 X_val = val.data.numpy()
 y_val = val.targets.numpy()
-
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after converting to numpy")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
@@ -42,9 +41,14 @@ def downsample(X, y):
 ### Perform downsampling on X_train, y_train, X_val, y_val
 X_train, y_train = downsample(X_train, y_train)
 X_val, y_val = downsample(X_val, y_val)
-
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after downsampling")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
+
+### Some sanity checks
+assert X_train.max() == 255
+assert X_train.min() == 0
+assert X_val.max() == 255
+assert X_val.min() == 0
 
 ## Plot the images of a few images in the dataset just to see if label is right
 # Function to plot a grid of images with labels
@@ -66,8 +70,7 @@ def plot_images(X, y, start, plot):
 plot_images(X_train, y_train, 25000, False)
 plot_images(X_val, y_val, 25000, False)
 
-
-## Part (b)
+## Problem 3, Part (b)
 class embedding_t:
     def __init__(self):
         # initialize to appropriate sizes, fill with Gaussian entries
@@ -142,7 +145,7 @@ class embedding_t:
         dhl = dhl.transpose(0, 1, 3, 2, 4).reshape(B, 28, 28) # B x 28 x 28
         return dhl
 
-## Part (c)
+## Problem 3, Part (c)
 class linear_t:
     def __init__(self):
         # initialize to appropriate sizes, fill with Gaussian entries
@@ -185,7 +188,7 @@ class linear_t:
 
         return dhl
 
-## part (d)
+## Problem 3, part (d)
 class relu_t:
     def __init__(self):
         pass
@@ -203,7 +206,7 @@ class relu_t:
     def backward(self, dhl_plus_1):
         return np.where(self.hl < 0, 0, dhl_plus_1)
 
-## part (e)
+## Problem 3, part (e)
 class softmax_cross_entropy_t:
     def __init__(self):
         pass
@@ -252,7 +255,7 @@ class softmax_cross_entropy_t:
         return dhl
 
 
-## Part (f): Check implementation of forward and backward functionalities for all layers
+## Problem 3, Part (f): Check implementation of forward and backward functionalities for all layers
 
 ### Checking Linear Layer Backward
 #indices_W must be passed as a list of tuples
@@ -488,6 +491,7 @@ def test_backward_embedding_random_indices():
 
 ## part (g)
 ### Dataset already loaded from part (a)
+### Divide by 255 for training stability
 X_train = X_train.astype(np.float32) / 255.0
 X_val = X_val.astype(np.float32) / 255.0
 
