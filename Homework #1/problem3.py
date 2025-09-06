@@ -4,6 +4,7 @@
 import torchvision as thv
 train = thv.datasets.MNIST("./", download=True, train=True)
 val = thv.datasets.MNIST("./", download=True, train=False)
+print("Part (a): Print out shape of train.data, train.targets, val.data, and val.targets")
 print(train.data.shape, len(train.targets))
 print(val.data.shape, len(val.targets))
 
@@ -14,6 +15,7 @@ y_train = train.targets.numpy()
 X_val = val.data.numpy()
 y_val = val.targets.numpy()
 
+print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after converting to numpy")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
 ### Take 50% of each class from training and validation
@@ -34,6 +36,7 @@ def downsample(X, y):
 X_train, y_train = downsample(X_train, y_train)
 X_val, y_val = downsample(X_val, y_val)
 
+print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after downsampling")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
 ## Plot the images of a few images in the dataset just to see if label is right
@@ -505,13 +508,14 @@ X_val = X_val.astype(np.float32) / 255.0
 l1, l2, l3, l4 = embedding_t(), linear_t(), relu_t(), softmax_cross_entropy_t()
 net = [l1, l2, l3, l4]
 
-print(f"Part g: X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}")
+print("Part g: Print shapes of X_train and y_train again")
+print(f"X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}")
 
 # Train for at least 1000 iterations
 B = 32
 lr = 0.1
 training_loss = []
-epochs = 10000
+epochs = 15000
 for t in range(epochs):
     # 1. sample a mini-batch of size = 32
     # each image in the mini-batch is chosen uniformly randomly from the
@@ -552,10 +556,102 @@ for t in range(epochs):
     l2.b = l2.b - lr*db2
 
 plt.figure(figsize=(8, 5))
-plt.plot(training_loss, label='Training Loss')
+plt.plot(training_loss, label='Training Loss[Ravi]')
 plt.xlabel('Iteration')
 plt.ylabel('Loss')
 plt.title('Training Loss vs Iteration')
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.savefig('training_loss_plot_ravi.png', dpi=300)
+print(f"Final Training Error: {error}, Final Training Loss: {ell}")
+
+
+### Test Implementation using PyTorch
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class EmbeddingLayer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Conv2d(
+            in_channels = 1,
+            out_channels = 8,
+            kernel_size = 4,
+            stride = 4,
+            bias = True
+        )
+    
+    # x: B X 28 X 28
+    def forward(self, x):
+        x = x.unsqueeze(1) # Becomes B X 1 X 28 X 28
+        x = self.conv(x) # Becomes B X 8 x 7 x 7
+        x = x.flatten(start_dim = 1) # Becomes B X 392
+        return x
+
+class NN(nn.Module):
+    def __init__(self):
+        super(NN, self).__init__()
+        self.embed = EmbeddingLayer()
+        self.fc = nn.Linear(392, 10)
+    
+    def forward(self, x):
+        x = self.embed(x)
+        x = self.fc(x)
+        x = F.relu(x)
+
+        return x
+
+## Hyperparameters
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+
+batch_size = 32
+lr = 0.1
+epochs = 15000
+
+# Convert NumPy arrays to torch tensors
+X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
+y_val_tensor = torch.tensor(y_val, dtype=torch.long)
+
+# Create TensorDataset and DataLoader
+train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+model = NN()
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr=lr)
+
+training_loss = []
+for epoch in range(epochs):
+    model.train()
+    
+    # Randomly sample a batch
+    indices = torch.randint(0, X_train.shape[0], (batch_size,))
+    batch_X = X_train_tensor[indices]
+    batch_y = y_train_tensor[indices]
+    
+    optimizer.zero_grad()
+    outputs = model(batch_X)
+    loss = criterion(outputs, batch_y)
+    loss.backward()
+    optimizer.step()
+    
+    if (epoch + 1) % 100 == 0:  # print every 50 epochs
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+    training_loss.append(loss.item())
+
+
+plt.figure(figsize=(8, 5))
+plt.plot(training_loss, label='Training Loss[PyTorch]')
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+plt.title('Training Loss vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('training_loss_plot_torch.png', dpi=300)
