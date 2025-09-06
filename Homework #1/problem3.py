@@ -1,6 +1,11 @@
 # Ravi Raghavan, Homework #1, Problem 3
 
+# Throughout the entire problem, I set the random state here for reproducability
+random_state = 42
+
 ## Part (a)
+
+### Load Data from torchvision
 import torchvision as thv
 train = thv.datasets.MNIST("./", download=True, train=True)
 val = thv.datasets.MNIST("./", download=True, train=False)
@@ -10,6 +15,7 @@ print(val.data.shape, len(val.targets))
 
 ### Convert everything to numpy. From here on out, NO Torch/Other Deep Learning Library 
 import numpy as np
+np.random.seed(random_state)
 X_train = train.data.numpy()
 y_train = train.targets.numpy()
 X_val = val.data.numpy()
@@ -18,7 +24,7 @@ y_val = val.targets.numpy()
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after converting to numpy")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
-### Take 50% of each class from training and validation
+### Given X and y, where X contains training samples and y contains labels, keep only 50% of each class! 
 def downsample(X, y):
     # Store downsampled X and y
     X_downsampled, y_downsampled = [], []
@@ -33,6 +39,7 @@ def downsample(X, y):
     
     return np.concatenate(X_downsampled, axis = 0), np.concatenate(y_downsampled, axis = 0)
 
+### Perform downsampling on X_train, y_train, X_val, y_val
 X_train, y_train = downsample(X_train, y_train)
 X_val, y_val = downsample(X_val, y_val)
 
@@ -247,16 +254,7 @@ class softmax_cross_entropy_t:
 
 ## Part (f): Check implementation of forward and backward functionalities for all layers
 
-### Checking Linear Layer [ Forward + Backward ]
-def check_forward_linear():
-    layer = linear_t()
-    hl = np.random.randn(1, 392)
-    out1 = layer.forward(hl)
-    out2 = hl @ layer.w.T + layer.b
-    np.testing.assert_allclose(out1, out2, rtol=1e-6, atol=1e-6)
-
-# check_forward_linear()
-
+### Checking Linear Layer Backward
 #indices_W must be passed as a list of tuples
 #indices_b must be passed as list
 #indices_h must be passed as list
@@ -300,7 +298,7 @@ def check_backward_linear(k, indices_W, indices_b, indices_h):
         np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
 
 def test_backward_linear_random_indices():
-    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+    rng = np.random.default_rng()
 
     # Sample 5 values of k
     k_values = rng.choice(10, size=5, replace=False)
@@ -318,18 +316,7 @@ def test_backward_linear_random_indices():
         # Run the gradient check for this k
         check_backward_linear(k, indices_W, indices_b, indices_h)
 
-# test_backward_linear_random_indices()
-
-### Checking ReLU Layer
-def check_forward_relu():
-    layer = relu_t()
-    hl = np.random.randn(1, 10)
-    out1 = layer.forward(hl)
-    out2 = np.maximum(0, hl)
-    np.testing.assert_allclose(out1, out2, rtol=1e-6, atol=1e-6)
-
-# check_forward_relu()
-
+### Checking ReLU Backward Propagation
 def check_backward_relu(k, indices_h):
     layer = relu_t()
     hl = np.random.randn(1, 10)
@@ -351,7 +338,7 @@ def check_backward_relu(k, indices_h):
         np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
 
 def test_backward_relu_random_indices():
-    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+    rng = np.random.default_rng()
 
     # Sample 5 values of k
     k_values = rng.choice(10, size=5, replace=False)
@@ -363,10 +350,9 @@ def test_backward_relu_random_indices():
         # Run the gradient check for this k
         check_backward_relu(k, indices_h)
 
-# test_backward_relu_random_indices()
 
 ### Test softmax_cross_entropy_t Function
-def softmax_cross_entropy(hl, y):
+def softmax_cross_entropy_utility(hl, y):
     # Flatten y as sanity check 
     y = y.flatten()
 
@@ -381,7 +367,10 @@ def softmax_cross_entropy(hl, y):
     correct_probs = hl_plus_1[np.arange(B), y]
     ell = -np.mean(np.log(correct_probs + 1e-12)) #Adding 1e-12 for numerical stability
 
-    return ell
+    y_pred = np.argmax(hl_plus_1, axis=1)
+    error = np.mean(y_pred != y)
+
+    return ell, error
 
 def check_backward_softmax(indices_h):
     layer = softmax_cross_entropy_t()
@@ -397,12 +386,14 @@ def check_backward_softmax(indices_h):
     for i in indices_h:
         eps = np.zeros(shape = hl.shape)
         eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
-        diff = (softmax_cross_entropy(hl + eps, y) - softmax_cross_entropy(hl - eps, y))
+        LHS, _ = softmax_cross_entropy_utility(hl + eps, y)
+        RHS, _ = softmax_cross_entropy_utility(hl - eps, y)
+        diff = LHS - RHS
         deriv_h = diff / (2 * eps)[0, i]
         np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
 
 def test_backward_softmax_random_indices():
-    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+    rng = np.random.default_rng()
 
     # For h (10,), pick 4 random indices
     indices_h = rng.choice(10, size=5, replace=False).tolist()
@@ -410,10 +401,9 @@ def test_backward_softmax_random_indices():
     # Run the gradient check for this k
     check_backward_softmax(indices_h)
     
-# test_backward_softmax_random_indices()
 
 ### Test embedding_t Function
-def embedding(hl, W, b):
+def embedding_utility(hl, W, b):
     # Store Batch Value
     B = hl.shape[0]
 
@@ -462,23 +452,23 @@ def check_backward_embedding(t, indices_W, indices_b, indices_h):
     for i, j, k in indices_W:
         eps = np.zeros(shape = W.shape)
         eps[i, j, k] = np.random.normal(loc = 0.0, scale = 1e-8)
-        deriv_W = (embedding(hl, W + eps, b) - embedding(hl, W - eps, b))[0, t] / (2 * eps)[i, j, k]
+        deriv_W = (embedding_utility(hl, W + eps, b) - embedding_utility(hl, W - eps, b))[0, t] / (2 * eps)[i, j, k]
         np.testing.assert_allclose(dw[i, j, k], deriv_W, rtol=1e-6, atol=1e-6)
     
     for i in indices_b:
         eps = np.zeros(shape = b.shape)
         eps[i] = np.random.normal(loc = 0.0, scale = 1e-8)
-        deriv_b = (embedding(hl, W, b + eps) - embedding(hl, W, b - eps))[0, t] / (2 * eps)[i]
+        deriv_b = (embedding_utility(hl, W, b + eps) - embedding_utility(hl, W, b - eps))[0, t] / (2 * eps)[i]
         np.testing.assert_allclose(db[i], deriv_b, rtol=1e-6, atol=1e-6)
     
     for i, j in indices_h:
         eps = np.zeros(shape = hl.shape)
         eps[0, i, j] = np.random.normal(loc = 0.0, scale = 1e-8)
-        deriv_h = (embedding(hl + eps, W, b) - embedding(hl - eps, W, b))[0, t] / (2 * eps)[0, i, j]
+        deriv_h = (embedding_utility(hl + eps, W, b) - embedding_utility(hl - eps, W, b))[0, t] / (2 * eps)[0, i, j]
         np.testing.assert_allclose(dhl[0, i, j], deriv_h, rtol=1e-6, atol=1e-6)
 
 def test_backward_embedding_random_indices():
-    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+    rng = np.random.default_rng() # Set seed for reproducability
 
     # Sample 5 values of k
     t_values = rng.choice(10, size=5, replace=False)
@@ -496,9 +486,6 @@ def test_backward_embedding_random_indices():
         # Run the gradient check for this k
         check_backward_embedding(t, indices_W, indices_b, indices_h)
 
-# test_backward_embedding_random_indices()
-
-
 ## part (g)
 ### Dataset already loaded from part (a)
 X_train = X_train.astype(np.float32) / 255.0
@@ -511,10 +498,38 @@ net = [l1, l2, l3, l4]
 print("Part g: Print shapes of X_train and y_train again")
 print(f"X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}")
 
+def validate(l1_w, l1_b, l2_w, l2_b):
+    # 1. iterate over mini-batches from the validation dataset
+    # note that this should not be done randomly, we want to check
+    # every image only once
+
+    loss, tot_error = 0, 0
+    for i in range(0, 5000, 32):
+        X_batch, y_batch = X_val[i: i + 32], y_val[i: i + 32]
+
+        # Compute forward pass
+        h1 = embedding_utility(X_batch, l1_w, l1_b)
+        h2 = h1 @ l2_w.T + l2_b
+        h3 = np.maximum(0, h2)
+        batch_loss, batch_error = softmax_cross_entropy_utility(h3, y_batch)
+
+        # Accumulate
+        B = X_batch.shape[0]
+        loss += batch_loss * B
+        tot_error += batch_error * B
+    
+    avg_loss = loss / X_val.shape[0]
+    avg_error = tot_error/ X_val.shape[0]
+    return avg_loss, avg_error
+
+
 # Train for at least 1000 iterations
 B = 32
 lr = 0.1
-training_loss = []
+training_losses = []
+training_errors = []
+validation_losses = []
+validation_errors = []
 epochs = 15000
 for t in range(epochs):
     # 1. sample a mini-batch of size = 32
@@ -547,7 +562,9 @@ for t in range(epochs):
     # 6. Print some quantities for logging
     if (t + 1) % 100 == 0:
         print(f"Epoch: {t + 1}, Loss: {ell}, Error: {error}")
-    training_loss.append(ell)
+    
+    training_losses.append(ell)
+    training_errors.append(error)
 
     # 7. one step of SGD
     l1.w = l1.w - lr*dw1
@@ -555,21 +572,43 @@ for t in range(epochs):
     l2.w = l2.w - lr*dw2
     l2.b = l2.b - lr*db2
 
+    # 8. Store validation loss/error every 1000 weight updates
+    if (t + 1) % 1000 == 0:
+        validation_loss, validation_error = validate(l1.w, l1.b, l2.w, l2.b)
+        validation_losses.append(validation_loss)
+        validation_errors.append(validation_error)
+
+# Store plot of training loss
 plt.figure(figsize=(8, 5))
-plt.plot(training_loss, label='Training Loss[Ravi]')
+plt.plot(training_losses, label='Training Loss[Ravi]')
 plt.xlabel('Iteration')
 plt.ylabel('Loss')
 plt.title('Training Loss vs Iteration')
 plt.legend()
 plt.grid(True)
 plt.savefig('training_loss_plot_ravi.png', dpi=300)
-print(f"Final Training Error: {error}, Final Training Loss: {ell}")
 
+# Store plot of validation loss
+plt.figure(figsize=(8, 5))
+plt.plot(validation_losses, label='Validation Loss[Ravi]')
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+plt.title('Validation Loss vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('validation_loss_plot_ravi.png', dpi=300)
+
+# Print Final Metrics
+print(f"Final Training Error: {training_errors[-1]}, Final Training Loss: {training_losses[-1]}")
+print(f"Final Validation Error: {validation_errors[-1]}, Final Validation Loss: {validation_losses[-1]}")
 
 ### Test Implementation using PyTorch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+torch.manual_seed(random_state)
 
 class EmbeddingLayer(nn.Module):
     def __init__(self):
@@ -603,9 +642,6 @@ class NN(nn.Module):
         return x
 
 ## Hyperparameters
-import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader
-
 batch_size = 32
 lr = 0.1
 epochs = 15000
@@ -627,7 +663,10 @@ model = NN()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=lr)
 
-training_loss = []
+training_losses = []
+training_errors = []
+validation_losses = []
+validation_errors = []
 for epoch in range(epochs):
     model.train()
     
@@ -641,17 +680,65 @@ for epoch in range(epochs):
     loss = criterion(outputs, batch_y)
     loss.backward()
     optimizer.step()
+
+    _, predicted = torch.max(outputs, 1)
+    batch_error = (predicted != batch_y).float().mean().item() * 100
+
+    training_losses.append(loss.item())
+    training_errors.append(batch_error)
     
-    if (epoch + 1) % 100 == 0:  # print every 50 epochs
-        print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
-    training_loss.append(loss.item())
+    if (epoch + 1) % 100 == 0:
+        print(f'Epoch [{epoch+1}/{epochs}], Training Loss: {loss.item():.4f}, Training Error: {batch_error:.2f}%')
+    
+    # Run validation every 1000 weight updates
+    if (epoch + 1) % 1000 == 0:
+        model.eval()  # set model to evaluation mode
+        val_loss = 0.0
+        val_error = 0.0
+        
+        with torch.no_grad():  # disable gradient computation
+            for i in range(0, X_val_tensor.shape[0], batch_size):
+                X_val_batch = X_val_tensor[i: i + batch_size]
+                y_val_batch = y_val_tensor[i: i + batch_size]
+
+                # Forward pass
+                val_outputs = model(X_val_batch)
+                batch_loss = criterion(val_outputs, y_val_batch)
+
+                # Compute batch error (percentage misclassified)
+                _, predicted = torch.max(val_outputs, 1)
+                batch_error = (predicted != y_val_batch).float().mean().item() * 100
+
+                # Accumulate weighted loss and error
+                val_loss += batch_loss.item() * X_val_batch.size(0)
+                val_error += batch_error * X_val_batch.size(0)
+
+        # Average over all validation samples
+        avg_val_loss = val_loss / X_val_tensor.shape[0]
+        avg_val_error = val_error / X_val_tensor.shape[0]
+
+        print(f'--- Validation Loss: {avg_val_loss:.4f}, Validation Error: {avg_val_error:.2f}% ---')
+
+        validation_losses.append(avg_val_loss)
+        validation_errors.append(avg_val_error)
+        
+        model.train()  # switch back to training mode
 
 
 plt.figure(figsize=(8, 5))
-plt.plot(training_loss, label='Training Loss[PyTorch]')
+plt.plot(training_losses, label='Training Loss[PyTorch]')
 plt.xlabel('Iteration')
 plt.ylabel('Loss')
 plt.title('Training Loss vs Iteration')
 plt.legend()
 plt.grid(True)
 plt.savefig('training_loss_plot_torch.png', dpi=300)
+
+plt.figure(figsize=(8, 5))
+plt.plot(validation_losses, label='Validation Loss[PyTorch]')
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+plt.title('Validation Loss vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('validation_loss_plot_torch.png', dpi=300)
