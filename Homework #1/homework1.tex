@@ -107,7 +107,7 @@ From the confusion matrix, we can see that the SVM classifier predicts only $9$ 
 \textbf{Intuitive Explanation: } \\
 To understand this behavior, we examine the classifier's hyperparameters, starting with $\gamma$. By default, $\gamma = \tfrac{1}{n_{\text{features}} \cdot X.var()}$, but in our case we set $\gamma = \text{auto}$, which instead uses $\gamma = \tfrac{1}{n_{\text{features}}}$. For our dataset, $X.var() \approx 5164$, so choosing $\gamma = \text{auto}$ made our $\gamma$ value about $5164$ times larger than the default. From our earlier discussion, we know that having a higher $\gamma$ value restricts each point's influence to a narrow area, enabling the model to fit the training data closely, which can increase overfitting and reduce generalization. \\
 
-\noindent \textbf{Extra: Improving Performance by Tweaking $\gamma$ to $\text{auto}$} \\
+\noindent \textbf{Extra: Improving Performance by Tweaking $\gamma$ to $\text{scale}$} \\
 \textbf{Experimental Results:}
     \begin{itemize}
         \item Training Accuracy: $0.98125$
