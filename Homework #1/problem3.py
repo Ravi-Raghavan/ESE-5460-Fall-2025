@@ -222,17 +222,14 @@ class softmax_cross_entropy_t:
     def backward(self):
         B = self.hl.shape[0]
 
-        # Initialize dh
-        dhl = np.zeros_like(self.hl)
-
         # Get output from softmax
-        softmax_output = self.hl_plus_1.flatten()
+        softmax_output = self.hl_plus_1
 
-        # Compute soft_max_deriv
-        soft_max_deriv = softmax_output * (1 - softmax_output)
-        loss_deriv = (-1 / (softmax_output + 1e-12)) * soft_max_deriv
+        # Create one hot labels
+        y_one_hot = np.zeros_like(softmax_output)
+        y_one_hot[np.arange(B), self.y] = 1
 
-        dhl[np.arange(B), self.y] = loss_deriv / B
+        dhl = (softmax_output - y_one_hot) / B
         return dhl
 
 
@@ -356,3 +353,49 @@ def test_backward_relu_random_indices():
 
 test_backward_relu_random_indices()
 
+### Test softmax_cross_entropy_t Function
+def softmax_cross_entropy(hl, y):
+    # Flatten y as sanity check 
+    y = y.flatten()
+
+    # Step 1: Compute hl_plus_1 after Softmax
+    exp_hl = np.exp(hl)
+    hl_plus_1 = exp_hl / np.sum(exp_hl, axis = 1, keepdims=True)
+    
+    # Step 2: Compute average loss over minibatch 
+    B = hl.shape[0]
+
+    # Pick the probabilities corresponding to correct labels
+    correct_probs = hl_plus_1[np.arange(B), y]
+    ell = -np.mean(np.log(correct_probs + 1e-12)) #Adding 1e-12 for numerical stability
+
+    return ell
+
+def check_backward_softmax(indices_h):
+    layer = softmax_cross_entropy_t()
+    hl = np.random.randn(1, 10)
+    y = np.random.randint(0, 10, size=(1,))
+
+    # Compute forward pass
+    layer.forward(hl, y)
+
+    # Compute backward
+    dhl = layer.backward()
+
+    for i in indices_h:
+        eps = np.zeros(shape = hl.shape)
+        eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        diff = (softmax_cross_entropy(hl + eps, y) - softmax_cross_entropy(hl - eps, y))
+        deriv_h = diff / (2 * eps)[0, i]
+        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+
+def test_backward_softmax_random_indices():
+    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+
+    # For h (10,), pick 4 random indices
+    indices_h = rng.choice(10, size=5, replace=False).tolist()
+
+    # Run the gradient check for this k
+    check_backward_softmax(indices_h)
+    
+test_backward_softmax_random_indices()
