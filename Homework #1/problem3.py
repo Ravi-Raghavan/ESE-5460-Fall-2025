@@ -630,6 +630,7 @@ class EmbeddingLayer(nn.Module):
     def forward(self, x):
         x = x.unsqueeze(1) # Becomes B X 1 X 28 X 28
         x = self.conv(x) # Becomes B X 8 x 7 x 7
+        x = x.permute(0, 2, 3, 1) # Becomes B x 7 x 7 x 8
         x = x.flatten(start_dim = 1) # Becomes B X 392
         return x
 
