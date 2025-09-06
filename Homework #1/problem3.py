@@ -130,14 +130,62 @@ class embedding_t:
         dhl = dhl.transpose(0, 1, 3, 2, 4).reshape(B, 28, 28) # B x 28 x 28
         return dhl
 
+## Part (c)
+class linear_t:
+    def __init__(self):
+        # initialize to appropriate sizes, fill with Gaussian entries
+        mean = 0.0
+        std = 0.01
+        self.w = np.random.normal(loc = mean, scale = std, size = (10, 392))
+        self.b = np.random.normal(loc = mean, scale = std, size = (10,))
 
-l1 = embedding_t()
+        # normalize to make the Frobenius norm of (w, b) equal to 1
+        eps = 1e-12
+        fro_norm = np.sqrt(np.sum(self.w ** 2) + np.sum(self.b ** 2))
+        self.w = self.w / (fro_norm + eps)
+        self.b = self.b / (fro_norm + eps)
+    
+    def zero_grad(self):
+        # useful to delete the stored backprop gradients of the previous mini-batch before you start a new mini-batch
+        self.dw, self.db = 0, 0
+    
+    def forward(self, hl):
+        # Cache hl in forward because needed for back
+        self.hl = hl
 
-# Test Forward Pass
-hl = np.random.randn(30000, 28, 28)
-hl_plus_1 = l1.forward(hl)
+        # Compute h_{l + 1}
+        hl_plus_1 = hl @ self.w.T + self.b
 
-# Test Backward Pass
-dhl_plus_1 = np.random.randn(30000, 392)
-dhl = l1.backward(dhl_plus_1)
-print(dhl.shape)
+        return hl_plus_1
+    
+    # Shape of dhl_plus_1: B x 10
+    def backward(self, dhl_plus_1):
+        # Compute dhl
+        dhl = dhl_plus_1 @ self.w
+        
+        # Compute db
+        db = dhl_plus_1.sum(axis = 0)
+        self.db = db
+
+        # Compute dw
+        dw = dhl_plus_1.T @ self.hl
+        self.dw = dw
+
+        return dhl
+
+## part (d)
+class relu_t:
+    def forward(self, hl):
+        # Cache hl in forward because needed for back
+        self.hl = hl
+
+        # Compute h_{l + 1}
+        hl_plus_1 = np.max(0, hl)
+
+        return hl_plus_1
+    
+    def backward(self, dhl_plus_1):
+        return np.where(self.hl < 0, 0, dhl_plus_1)
+
+## part (e)
+
