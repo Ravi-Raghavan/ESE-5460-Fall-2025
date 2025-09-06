@@ -127,7 +127,7 @@ class embedding_t:
 
         # Step 6: Compute dhl
         dhl = (self.w * dhl_plus_1_reshaped).sum(axis = -1) # B x 7 x 7 x 4 x 4 
-        dhl = dhl.transpose(0, 1, 3, 2, 4).reshape(B, 28, 28)
+        dhl = dhl.transpose(0, 1, 3, 2, 4).reshape(B, 28, 28) # B x 28 x 28
         return dhl
 
 
@@ -139,4 +139,5 @@ hl_plus_1 = l1.forward(hl)
 
 # Test Backward Pass
 dhl_plus_1 = np.random.randn(30000, 392)
-l1.backward(dhl_plus_1)
+dhl = l1.backward(dhl_plus_1)
+print(dhl.shape)
