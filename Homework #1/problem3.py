@@ -188,4 +188,51 @@ class relu_t:
         return np.where(self.hl < 0, 0, dhl_plus_1)
 
 ## part (e)
+class softmax_cross_entropy_t:
+    def __init__(self):
+        pass
+
+    def forward(self, hl, y):
+        # Cache hl in forward because needed for back
+        self.hl = hl
+
+        # Flatten y as sanity check 
+        y = y.flatten()
+        self.y = y
+
+        # Step 1: Compute hl_plus_1 after Softmax
+        exp_hl = np.exp(hl)
+        hl_plus_1 = exp_hl / np.sum(exp_hl, axis = 1, keepdims=True)
+
+        self.hl_plus_1 = hl_plus_1
+        
+        # Step 2: Compute average loss over minibatch 
+        B = hl.shape[0]
+
+        # Pick the probabilities corresponding to correct labels
+        correct_probs = hl_plus_1[np.arange(B), y]
+        ell = -np.mean(np.log(correct_probs + 1e-12)) #Adding 1e-12 for numerical stability
+
+        # Step 3: Compute classification error 
+        y_pred = np.argmax(hl_plus_1, axis=1)
+        error = np.mean(y_pred != y)
+
+        return ell, error
+
+    def backward(self):
+        B = self.hl.shape[0]
+
+        # Initialize dh
+        dhl = np.zeros_like(self.hl)
+
+        # Get output from softmax
+        softmax_output = self.hl_plus_1.flatten()
+
+        # Compute soft_max_deriv
+        soft_max_deriv = softmax_output * (1 - softmax_output)
+        loss_deriv = (-1 / (softmax_output + 1e-12)) * soft_max_deriv
+
+        dhl[np.arange(B), self.y] = loss_deriv / B
+        return dhl
+
 
