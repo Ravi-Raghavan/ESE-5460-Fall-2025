@@ -19,21 +19,133 @@
 
 \theoremstyle{definition}
 \newtheorem{solution}[theorem]{Solution}
+\renewcommand{\solution}{\textbf{Solution}\newline}
+
 
 \usepackage{times}
 \title{ESE 546\\[0.1in]
-Homework 0}
+Homework 1}
 \author{
-John Doe [john@seas],\\
-Collaborators: Jane Doe [jane@seas]
+Ravi Raghavan [rr1133@seas.upenn.edu],\\
+Collaborators: N/A
 }
 
 \begin{document}
 \maketitle
 
-\begin{solution}[Time spent: 1 hour]
+% Important LInks
+% 1. https://scikit-learn.org/stable/modules/svm.html#implementation-details
+% 2. https://scikit-learn.org/stable/auto_examples/svm/plot_svm_kernels.html#sphx-glr-auto-examples-svm-plot-svm-kernels-py
+% 3. https://www.csie.ntu.edu.tw/~cjlin/papers/libsvm.pdf
+% 4. https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
 
-Your solution goes here.
+% https://scikit-learn.org/stable/modules/svm.html#svm-mathematical-formulation
+\begin{solution}[Time spent: 1 hour]
+\begin{enumerate}
+    \item[(a)] The slack-variable based optimization problem can be formulated as such
+    \begin{align}
+        \label{eq:1a-1}
+            \begin{array}{ll}
+\text{minimize}_{\theta, \theta_0, \xi_1, \cdots, \xi_n} & \frac{1}{2} \|\theta\|^2 +  C \sum_{i = 1}^n \xi_i \\
+\text{subject to} & y_i (\theta^T x_i + \theta_0) \geq 1 - \xi_i,\, \forall i = 1, \cdots, n \\
+& \xi_i \geq 0,\, \forall i = 1, \cdots, n
+\end{array}
+        \end{align}
+
+    where $C$ is a hyperparameter and our optimization variables are $\theta, \theta_0, \xi_1, \cdots, \xi_n$. From \eqref{eq:1a-1}, we observe that a larger value of $C$ places a stronger penalty on slack, reducing the margin and prioritizing correct classification of training points. Conversely, a smaller value of $C$ allows more slack, resulting in a wider margin and greater tolerance for misclassifications.  
+
+\textbf{\underline{Answer:}} The objective function is $\frac{1}{2} \|\theta\|^2 +  C \sum_{i = 1}^n \xi_i$, where $C$ is a hyperparameter as described above
+
+    \item[(b)] In an SVM, the support samples are the \textbf{\underline{critical}} data points that determine the position/orientation of the separating hyperplane. Removing any non-support sample would NOT affect the decision boundary. In a Hard-Margin SVM, support samples are samples that lie exactly on the margin boundaries. Mathematically, in the Hard Margin case, we can say that for any given support sample $(x_s, y_s)$, the following holds true 
+    \begin{align}
+    \label{eq:1a-2}
+        y_s (\theta^T x_s + \theta_0) = 1
+    \end{align}
+
+    % https://kuleshov-group.github.io/aml-book/contents/lecture13-svm-dual.html#the-dual-of-the-svm-problem
+    % https://machine-learning-upenn.github.io/assets/notes/Lec8.pdf
+    % https://www.cs.cmu.edu/~aarti/Class/10701_Spring21/Lecs/svm_dual_kernel_inked.pdf
+
+    % https://chatgpt.com/c/68bb1aad-1140-832b-918c-fa8c29b1b32d
+    % https://www.csie.ntu.edu.tw/~cjlin/papers/libsvm.pdf
+    \noindent In the Soft Margin case, support samples can lie on the margin, inside the margin boundaries, or even be a misclassified point. 
+    \item[(c)] Check Code
+    
+    %C-SVM:https://www.csie.ntu.edu.tw/~cjlin/papers/libsvm.pdf
+    % C-Parameter: 
+    % - https://eitca.org/artificial-intelligence/eitc-ai-mlp-machine-learning-with-python/support-vector-machine/svm-parameters/examination-review-svm-parameters/what-is-the-purpose-of-the-c-parameter-in-svm-how-does-a-smaller-value-of-c-affect-the-margin-and-misclassifications/
+    % - https://scikit-learn.org/stable/modules/svm.html#kernel-functions
+    % - https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html#sphx-glr-auto-examples-svm-plot-rbf-parameters-py
+    \item[(d)] $C$ is a regularization parameter that controls the tradeoff between correctly classifying training points and maximizing the margin. A larger $C$ strongly penalizes misclassified points, favoring correct classification even if it results in a narrower margin. This can reduce generalization, making the model more sensitive to the training data. Conversely, a smaller $C$ tolerates some misclassifications, resulting in a wider margin and even better generalization. \\
+
+    \noindent $\gamma$ is the kernel coefficient in rbf, polynomial, and sigmoid kernels, determining the reach of each training point's influence. This influence refers to a region around a training point where the kernel function assigns significant weight when computing similarities. A small $\gamma$ gives each training data point a broad influence, producing a smoother, more generalized decision boundary and better overall generalization. On the other hand, a larger $\gamma$ restricts each point's influence to a narrow area, enabling the model to fit the training data closely, which can increase overfitting and reduce generalization. \\  
+
+    In Scikit-learn, the default value of $C$ is $1.0$, and the default value of $\gamma$ is "scale", which is computed as $\frac{1}{n_{\text{features}} * X.var()}$, where $n_{\text{features}}$ is the number of features and $X.var()$ is the variance of all the values in the design matrix. \\
+
+    When running the given SVM Classifier, here are the experimental results \\
+    \textbf{Experimental Results:}
+    \begin{itemize}
+        \item Training Accuracy: $1$
+        \item Training Error: $0$
+        \item Validation Accuracy: $0.0875$
+        \item Validation Error: $0.9125$
+        \item Support Vector Ratio: $1.0$
+        \item Test Accuracy: $\approx 0.1014$
+        \item Test Error: $\approx 0.8986$
+    \end{itemize}
+
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=0.5\linewidth]{confusion_matrix_1d.png}
+        \caption{Confusion Matrix}
+        \label{fig:placeholder}
+    \end{figure}
+
+\textbf{Identifying the Pattern:} \\
+From the confusion matrix, we can see that the SVM classifier predicts only $9$ for all test samples, which is the clear pattern here.  \\
+
+\textbf{Intuitive Explanation: } \\
+To understand this behavior, we examine the classifier's hyperparameters, starting with $\gamma$. By default, $\gamma = \tfrac{1}{n_{\text{features}} \cdot X.var()}$, but in our case we set $\gamma = \text{auto}$, which instead uses $\gamma = \tfrac{1}{n_{\text{features}}}$. For our dataset, $X.var() \approx 5164$, so choosing $\gamma = \text{auto}$ made our $\gamma$ value about $5164$ times larger than the default. From our earlier discussion, we know that having a higher $\gamma$ value restricts each point's influence to a narrow area, enabling the model to fit the training data closely, which can increase overfitting and reduce generalization. \\
+
+\noindent \textbf{Extra: Improving Performance by Tweaking $\gamma$ to $\text{auto}$} \\
+\textbf{Experimental Results:}
+    \begin{itemize}
+        \item Training Accuracy: $0.98125$
+        \item Training Error: $0.01875$
+        \item Validation Accuracy: $0.96$
+        \item Validation Error: $0.04$
+        \item Support Vector Ratio: $0.380375$
+        \item Test Accuracy: $\approx 0.9578$
+        \item Test Error: $\approx 0.0422$
+    \end{itemize}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{confusion_matrix_1d_2.png}
+    \caption{Confusion Matrix}
+    \label{fig:placeholder}
+\end{figure}
+
+\item[(e)] We will list out the parameters from Scikit-learn and analyze each of them: 
+\begin{itemize}
+    \item C: Already discussed previously
+    \item kernel: Kernel function to use 
+    \item degree: the degree of the polynomial kernel 
+    \item gamma: Already discussed previously
+    \item coef0: Independent term in polynomial and sigmoid kernels
+    \item shrinking: 
+    \item probability: 
+    \item tol:
+    \item $\text{cache\_size}$: Size of kernel cache in MB
+    \item verbose: 
+    \item $\text{max\_iter}$
+    \item $\text{decision\_function\_shape}$
+    \item $\text{break\_ties}$
+    \item $\text{random\_state}$: 
+
+\end{itemize}
+    
+\end{enumerate}
 \end{solution}
 
 \clearpage
