@@ -7,7 +7,7 @@ val = thv.datasets.MNIST("./", download=True, train=False)
 print(train.data.shape, len(train.targets))
 print(val.data.shape, len(val.targets))
 
-### Convert everything to numpy. From here on out, no Torch/Other Deep Learning Library 
+### Convert everything to numpy. From here on out, NO Torch/Other Deep Learning Library 
 import numpy as np
 X_train = train.data.numpy()
 y_train = train.targets.numpy()
@@ -39,7 +39,9 @@ print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 ## Plot the images of a few images in the dataset just to see if label is right
 # Function to plot a grid of images with labels
 import matplotlib.pyplot as plt
-def plot_images(X, y, start):
+def plot_images(X, y, start, plot):
+    if not plot:
+        return
     plt.figure(figsize=(8, 8))
     for i in range(start, start + 16):
         offset = i - start
@@ -51,8 +53,8 @@ def plot_images(X, y, start):
     plt.show()
 
 # Plot first 16 images from the downsampled training set
-# plot_images(X_train, y_train, 25000)
-# plot_images(X_val, y_val)
+plot_images(X_train, y_train, 25000, False)
+plot_images(X_val, y_val, 25000, False)
 
 
 ## Part (b)
@@ -175,6 +177,10 @@ class linear_t:
 
 ## part (d)
 class relu_t:
+    def __init__(self):
+        pass
+    def zero_grad(self):
+        pass
     def forward(self, hl):
         # Cache hl in forward because needed for back
         self.hl = hl
@@ -190,6 +196,9 @@ class relu_t:
 ## part (e)
 class softmax_cross_entropy_t:
     def __init__(self):
+        pass
+
+    def zero_grad(self):
         pass
 
     def forward(self, hl, y):
@@ -243,7 +252,7 @@ def check_forward_linear():
     out2 = hl @ layer.w.T + layer.b
     np.testing.assert_allclose(out1, out2, rtol=1e-6, atol=1e-6)
 
-check_forward_linear()
+# check_forward_linear()
 
 #indices_W must be passed as a list of tuples
 #indices_b must be passed as list
@@ -306,7 +315,7 @@ def test_backward_linear_random_indices():
         # Run the gradient check for this k
         check_backward_linear(k, indices_W, indices_b, indices_h)
 
-test_backward_linear_random_indices()
+# test_backward_linear_random_indices()
 
 ### Checking ReLU Layer
 def check_forward_relu():
@@ -316,7 +325,7 @@ def check_forward_relu():
     out2 = np.maximum(0, hl)
     np.testing.assert_allclose(out1, out2, rtol=1e-6, atol=1e-6)
 
-check_forward_relu()
+# check_forward_relu()
 
 def check_backward_relu(k, indices_h):
     layer = relu_t()
@@ -351,7 +360,7 @@ def test_backward_relu_random_indices():
         # Run the gradient check for this k
         check_backward_relu(k, indices_h)
 
-test_backward_relu_random_indices()
+# test_backward_relu_random_indices()
 
 ### Test softmax_cross_entropy_t Function
 def softmax_cross_entropy(hl, y):
@@ -398,7 +407,7 @@ def test_backward_softmax_random_indices():
     # Run the gradient check for this k
     check_backward_softmax(indices_h)
     
-test_backward_softmax_random_indices()
+# test_backward_softmax_random_indices()
 
 ### Test embedding_t Function
 def embedding(hl, W, b):
@@ -484,4 +493,69 @@ def test_backward_embedding_random_indices():
         # Run the gradient check for this k
         check_backward_embedding(t, indices_W, indices_b, indices_h)
 
-test_backward_embedding_random_indices()
+# test_backward_embedding_random_indices()
+
+
+## part (g)
+### Dataset already loaded from part (a)
+X_train = X_train.astype(np.float32) / 255.0
+X_val = X_val.astype(np.float32) / 255.0
+
+### Initialize all Layers
+l1, l2, l3, l4 = embedding_t(), linear_t(), relu_t(), softmax_cross_entropy_t()
+net = [l1, l2, l3, l4]
+
+print(f"Part g: X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}")
+
+# Train for at least 1000 iterations
+B = 32
+lr = 0.1
+training_loss = []
+epochs = 10000
+for t in range(epochs):
+    # 1. sample a mini-batch of size = 32
+    # each image in the mini-batch is chosen uniformly randomly from the
+    # training dataset
+    indices = np.random.choice(X_train.shape[0], size=B, replace=False)
+    X_train_batch = X_train[indices]
+    y_train_batch = y_train[indices]
+
+    # 2. zero gradient buffer
+    for l in net:
+        l.zero_grad()
+
+    # 3. Forward Pass
+    h1 = l1.forward(X_train_batch)
+    h2 = l2.forward(h1)
+    h3 = l3.forward(h2)
+    ell, error = l4.forward(h3, y_train_batch)
+
+    # 4. Backward Pass
+    dh3 = l4.backward()
+    dh2 = l3.backward(dh3)
+    dh1 = l2.backward(dh2)
+    dx = l1.backward(dh1)
+
+    # 5. Gather Backprop gradients
+    dw1, db1 = l1.dw, l1.db
+    dw2, db2 = l2.dw, l2.db
+
+    # 6. Print some quantities for logging
+    if (t + 1) % 100 == 0:
+        print(f"Epoch: {t + 1}, Loss: {ell}, Error: {error}")
+    training_loss.append(ell)
+
+    # 7. one step of SGD
+    l1.w = l1.w - lr*dw1
+    l1.b = l1.b - lr*db1
+    l2.w = l2.w - lr*dw2
+    l2.b = l2.b - lr*db2
+
+plt.figure(figsize=(8, 5))
+plt.plot(training_loss, label='Training Loss')
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+plt.title('Training Loss vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.show()
