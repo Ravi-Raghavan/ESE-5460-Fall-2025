@@ -180,7 +180,7 @@ class relu_t:
         self.hl = hl
 
         # Compute h_{l + 1}
-        hl_plus_1 = np.max(0, hl)
+        hl_plus_1 = np.maximum(0, hl)
 
         return hl_plus_1
     
@@ -310,3 +310,49 @@ def test_backward_linear_random_indices():
         check_backward_linear(k, indices_W, indices_b, indices_h)
 
 test_backward_linear_random_indices()
+
+### Checking ReLU Layer
+def check_forward_relu():
+    layer = relu_t()
+    hl = np.random.randn(1, 10)
+    out1 = layer.forward(hl)
+    out2 = np.maximum(0, hl)
+    np.testing.assert_allclose(out1, out2, rtol=1e-6, atol=1e-6)
+
+check_forward_relu()
+
+def check_backward_relu(k, indices_h):
+    layer = relu_t()
+    hl = np.random.randn(1, 10)
+
+    # Compute forward pass
+    layer.forward(hl)
+
+    # Set up dhl_plus_1
+    dhl_plus_1 = np.zeros(shape = (1, 10))
+    dhl_plus_1[0, k] = 1 # Shape: 1 x 10
+
+    # Compute backward
+    dhl = layer.backward(dhl_plus_1)
+
+    for i in indices_h:
+        eps = np.zeros(shape = hl.shape)
+        eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_h = ((np.maximum(0, hl + eps)) - (np.maximum(0, hl - eps)))[0, k] / (2 * eps)[0, i]
+        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+
+def test_backward_relu_random_indices():
+    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+
+    # Sample 5 values of k
+    k_values = rng.choice(10, size=5, replace=False)
+
+    for k in k_values:
+        # For h (10,), pick 4 random indices
+        indices_h = rng.choice(10, size=4, replace=False).tolist()
+
+        # Run the gradient check for this k
+        check_backward_relu(k, indices_h)
+
+test_backward_relu_random_indices()
+
