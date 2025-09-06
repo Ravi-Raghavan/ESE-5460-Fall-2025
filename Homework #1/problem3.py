@@ -236,3 +236,77 @@ class softmax_cross_entropy_t:
         return dhl
 
 
+## Part (f): Check implementation of forward and backward functionalities for all layers
+
+### Checking Linear Layer [ Forward + Backward ]
+def check_forward_linear():
+    layer = linear_t()
+    hl = np.random.randn(1, 392)
+    out1 = layer.forward(hl)
+    out2 = hl @ layer.w.T + layer.b
+    np.testing.assert_allclose(out1, out2, rtol=1e-6, atol=1e-6)
+
+check_forward_linear()
+
+#indices_W must be passed as a list of tuples
+#indices_b must be passed as list
+#indices_h must be passed as list
+def check_backward_linear(k, indices_W, indices_b, indices_h):
+    layer = linear_t()
+    hl = np.random.randn(1, 392) # Shape: 1 x 392
+
+    # Compute forward pass
+    layer.forward(hl)
+
+    # Set up backward pass
+    W = layer.w # Shape: 10 x 392
+    b = layer.b # Shape: (10,)
+
+    # Set up dhl_plus_1
+    dhl_plus_1 = np.zeros(shape = (1, 10))
+    dhl_plus_1[0, k] = 1 # Shape: 1 x 10
+
+    # Compute backward
+    dhl = layer.backward(dhl_plus_1)
+    dw = layer.dw # Shape: 10 x 392
+    db = layer.db # Shape: (10,)
+
+    # Verify dw
+    for i, j in indices_W:
+        eps = np.zeros(shape = W.shape)
+        eps[i, j] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_W = ((hl @ (W + eps).T + b) - (hl @ (W - eps).T + b))[0, k] / (2 * eps)[i, j]
+        np.testing.assert_allclose(dw[i, j], deriv_W, rtol=1e-6, atol=1e-6)
+    
+    for i in indices_b:
+        eps = np.zeros(shape = b.shape)
+        eps[i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_b = ((hl @ W.T + (b + eps)) - (hl @ W.T + (b - eps)))[0, k] / (2 * eps)[i]
+        np.testing.assert_allclose(db[i], deriv_b, rtol=1e-6, atol=1e-6)
+    
+    for i in indices_h:
+        eps = np.zeros(shape = hl.shape)
+        eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_h = (((hl + eps) @ W.T + b) - ((hl - eps) @ W.T + b))[0, k] / (2 * eps)[0, i]
+        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+
+def test_backward_linear_random_indices():
+    rng = np.random.default_rng(seed=42) # Set seed for reproducability
+
+    # Sample 5 values of k
+    k_values = rng.choice(10, size=5, replace=False)
+
+    for k in k_values:
+        # For W (10 x 392), pick 10 random (i, j) pairs
+        indices_W = [(rng.integers(0, 10), rng.integers(0, 392)) for _ in range(10)]
+        
+        # For b (10,), pick 3 random indices
+        indices_b = rng.choice(10, size=3, replace=False).tolist()
+        
+        # For h (392,), pick 4 random indices
+        indices_h = rng.choice(392, size=4, replace=False).tolist()
+
+        # Run the gradient check for this k
+        check_backward_linear(k, indices_W, indices_b, indices_h)
+
+test_backward_linear_random_indices()
