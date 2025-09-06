@@ -614,6 +614,7 @@ import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 torch.manual_seed(random_state)
 
+# Define class for Embedding Layer
 class EmbeddingLayer(nn.Module):
     def __init__(self):
         super().__init__()
@@ -632,6 +633,7 @@ class EmbeddingLayer(nn.Module):
         x = x.flatten(start_dim = 1) # Becomes B X 392
         return x
 
+# Define Overall Neural Network
 class NN(nn.Module):
     def __init__(self):
         super(NN, self).__init__()
@@ -663,10 +665,12 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
+# Set up model, loss function, and optimizer
 model = NN()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=lr)
 
+# Begin the training + validation loop
 training_losses = []
 training_errors = []
 validation_losses = []
@@ -729,6 +733,7 @@ for epoch in range(epochs):
         model.train()  # switch back to training mode
 
 
+# Plot training + validation losses
 plt.figure(figsize=(8, 5))
 plt.plot(training_losses, label='Training Loss[PyTorch]')
 plt.xlabel('Iteration')
