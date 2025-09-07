@@ -63,6 +63,11 @@ y = y[chosen_indices]
 ### Use train_test_split to split x and y into train and validation sets (80% train, 20% validation)
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=random_state)
 
+# ## Normalize x_train, x_val, and x_test
+# x_train = x_train.astype(np.float64) / 255.0
+# x_val = x_val.astype(np.float64) / 255.0
+# x_test = x_test.astype(np.float64) / 255.0
+
 ## Part (d)
 ### Note to self: For better results, try classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
 from sklearn import svm
@@ -137,14 +142,14 @@ grid_search = GridSearchCV(
     verbose = 2
 )
 
-print("Fitting Grid Search on X_train + X_validation")
-X_combined = np.concatenate([x_train, x_val])
-y_combined = np.concatenate([y_train, y_val])
-grid_search.fit(X_combined, y_combined)
+# print("Fitting Grid Search on X_train + X_validation")
+# X_combined = np.concatenate([x_train, x_val])
+# y_combined = np.concatenate([y_train, y_val])
+# grid_search.fit(X_combined, y_combined)
 
-print("Results from cross-validation on training + validation set:")
-for mean, params in zip(grid_search.cv_results_["mean_test_score"], grid_search.cv_results_["params"]):
-    print(f"C={params['C']}, CV Accuracy={mean:.4f}")
+# print("Results from cross-validation on training + validation set:")
+# for mean, params in zip(grid_search.cv_results_["mean_test_score"], grid_search.cv_results_["params"]):
+#     print(f"C={params['C']}, CV Accuracy={mean:.4f}")
 
 
 ## Part (h)
@@ -179,3 +184,55 @@ plt.figure(1); plt.clf(); plt.imshow(image); plt.show()
 
 coeff_real, _ = gabor(image, frequency=freq, theta=theta, bandwidth=bandwidth)
 plt.figure(1); plt.clf(); plt.imshow(coeff_real); plt.show()
+
+## Part (j)
+theta = np.arange(0,np.pi,np.pi/4)
+frequency = np.arange(0.05,0.5,0.15)
+bandwidth = np.arange(0.3,1,0.3)
+
+filters = []
+for i in theta:
+    for j in frequency:
+        for k in bandwidth:
+            filters.append((i, j, k))
+
+print(f"Total filters: {len(filters)}")  # should be 36
+
+# Plotting filter bank
+fig, axes = plt.subplots(len(theta), len(frequency) * len(bandwidth), figsize=(18, 6))
+axes = axes.ravel()
+
+for i, (theta, freq, bw) in enumerate(filters):
+    kernel = np.real(gabor_kernel(frequency=freq, theta=theta, bandwidth=bw))
+    axes[i].imshow(kernel, cmap='gray')
+    axes[i].set_title(f"θ={theta:.2f}, f={freq:.2f}, bw={bw:.2f}", fontsize=8)
+    axes[i].axis("off")
+
+plt.tight_layout()
+plt.show()
+
+
+# Extract Gabor Features from images using the Gabor Filter Bank
+def extract_gabor_features(images, filters):
+    feats = []
+    for img in images:
+        img_feats = []
+        for theta, freq, bw in filters:
+            real, imag = gabor(img, frequency=freq, theta=theta, bandwidth=bw)
+            img_feats.extend(real.flatten())
+        feats.append(img_feats)
+    return np.array(feats)
+
+X_train_feats = extract_gabor_features(x_train, filters)
+X_test_feats = extract_gabor_features(x_test, filters)
+
+
+# Run PCA
+from sklearn.decomposition import PCA
+pca = PCA(n_components=200)   # reduce dimensionality if needed
+X_train_feats = pca.fit_transform(X_train_feats)
+X_test_feats = pca.transform(X_test_feats)
+
+# Train SVC
+clf = svm.SVC(kernel="linear")
+clf.fit(X_train_feats, y_train)
