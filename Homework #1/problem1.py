@@ -4,7 +4,7 @@
 
 ### Import numpy and set random seed for reproducability
 import numpy as np
-random_state = 5
+random_state = 42
 np.random.seed(random_state)
 
 ### Download the dataset using the given code
@@ -116,3 +116,66 @@ print("Confusion Matrix:\n", conf_matrix)
 ### " Can you explain these mistakes intuitively?"
 #### Looking at our SVM hyperparameters and Training/Test outputs, we see that we had a large number of support vectors. This is a key indication of overfitting. 
 #### 
+
+## Part (g)
+### Applying GridSearchCV on SVC 
+from sklearn.model_selection import GridSearchCV
+
+# Define model
+model = svm.SVC(kernel="rbf", gamma="auto")
+
+# Define parameter grid: try at least 5 different C values
+param_grid = {"C": [0.01, 0.1, 1, 10, 100]}
+
+# GridSearchCV with 5-fold CV on the training set
+grid_search = GridSearchCV(
+    estimator=model,
+    param_grid=param_grid,
+    scoring="accuracy",
+    cv=5,
+    return_train_score=True,
+    verbose = 2
+)
+
+print("Fitting Grid Search on X_train + X_validation")
+X_combined = np.concatenate([x_train, x_val])
+y_combined = np.concatenate([y_train, y_val])
+grid_search.fit(X_combined, y_combined)
+
+print("Results from cross-validation on training + validation set:")
+for mean, params in zip(grid_search.cv_results_["mean_test_score"], grid_search.cv_results_["params"]):
+    print(f"C={params['C']}, CV Accuracy={mean:.4f}")
+
+
+## Part (h)
+### Randomly subsample x to create dataset of size 2000 with 200 samples per label [100 for train + 100 for validation]
+#### First select the indices that we are going to use for the subsampling
+chosen_indices = []
+for label in np.unique(y):
+    indices = np.where(y == label)[0]
+    selected_indices = np.sort(np.random.choice(indices, size=200, replace=False)).tolist()
+    chosen_indices.extend(selected_indices)
+
+chosen_indices = np.array(chosen_indices)
+x = x[chosen_indices]
+y = y[chosen_indices]
+
+print(x.shape, y.shape)
+
+x_train, y_train, x_test, y_test = x[:1000], y[:1000], x[1000:], y[1000:]
+
+from skimage.filters import gabor_kernel , gabor
+import matplotlib.pyplot as plt
+freq, theta, bandwidth = 0.1, np.pi/4, 1
+gk = gabor_kernel(frequency=freq, theta=theta, bandwidth=bandwidth)
+plt.figure(1); plt.clf(); plt.imshow(gk.real); plt.show()
+plt.figure(2); plt.clf(); plt.imshow(gk.imag); plt.show()
+
+# convolve the input image with the kernel and get co-efficients
+# we will use only the real part and throw away the imaginary
+# part of the co-efficients
+image = x[0].reshape((14,14))
+plt.figure(1); plt.clf(); plt.imshow(image); plt.show()
+
+coeff_real, _ = gabor(image, frequency=freq, theta=theta, bandwidth=bandwidth)
+plt.figure(1); plt.clf(); plt.imshow(coeff_real); plt.show()
