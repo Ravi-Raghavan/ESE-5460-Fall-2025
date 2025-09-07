@@ -13,39 +13,22 @@ from sklearn.model_selection import train_test_split
 ds = fetch_openml("mnist_784", as_frame=False)
 x, x_test, y, y_test = train_test_split(ds.data, ds.target, test_size=0.2, random_state=random_state)
 
-m_non_test = x.shape[0]
-m_test = x_test.shape[0]
-
-### Get the max/min of x and x_test. Will proceed to convert to uint8
-assert np.max(x) == 255
-assert np.min(x) == 0
-assert np.max(x_test) == 255
-assert np.min(x_test) == 0
-
-### Convert x/x_test to uint8
-x = x.astype('uint8')
-x_test = x_test.astype('uint8')
+### Convert x/x_test to float and normalize(i.e. convert from [0, 255] to [0, 1])
+x = x.astype(np.float64) / 255
+x_test = x_test.astype(np.float64) / 255
 
 ### Downsample x and x_test from 28 x 28 to 14 x 14
 import cv2
 def downsample_images(images):
     downsampled_images = []
     for idx in range(images.shape[0]):
-        flattened_img = images[idx, :].flatten()
-        img_reshaped = flattened_img.reshape(28, 28)
-        img_downsampled = cv2.resize(img_reshaped, (14, 14))
+        reshaped_image = images[idx, :].reshape(28, 28)
+        img_downsampled = cv2.resize(reshaped_image, (14, 14))
         downsampled_images.append(img_downsampled.flatten())
     return np.vstack(downsampled_images)
 
 x = downsample_images(x)
 x_test = downsample_images(x_test)
-
-assert x.shape[0] == m_non_test
-assert x.shape[1] == 14 * 14
-assert x_test.shape[0] == m_test
-assert x_test.shape[1] == 14 * 14
-assert x.ndim == 2
-assert x_test.ndim == 2
 
 ### Randomly subsample x to create dataset of size 10000 with 1000 samples per label (subsample y accordingly)
 #### First select the indices that we are going to use for the subsampling
@@ -63,16 +46,9 @@ y = y[chosen_indices]
 ### Use train_test_split to split x and y into train and validation sets (80% train, 20% validation)
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=random_state)
 
-# ## Normalize x_train, x_val, and x_test
-# x_train = x_train.astype(np.float64) / 255.0
-# x_val = x_val.astype(np.float64) / 255.0
-# x_test = x_test.astype(np.float64) / 255.0
-
 ## Part (d)
-### Note to self: For better results, try classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
 from sklearn import svm
 classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'auto')
-print("Variance of X: ", x_train.var())
 
 ### Fit to training data
 classifier.fit(x_train, y_train)
@@ -90,14 +66,12 @@ y_test_pred = classifier.predict(x_test)
 from sklearn.metrics import accuracy_score
 training_accuracy_score = accuracy_score(y_train, y_train_pred)
 train_error = np.mean(y_train_pred != y_train)
-print("Training Accuracy: ", training_accuracy_score)
-print("Training Error: ", train_error)
+print("Training Accuracy: ", training_accuracy_score, " Training Error: ", train_error)
 
 ### Validation Error
 validation_accuracy_score = accuracy_score(y_val, y_val_pred)
 val_error = np.mean(y_val_pred != y_val)
-print("Validation Accuracy: ", validation_accuracy_score)
-print("Validation Error: ", val_error)
+print("Validation Accuracy: ", validation_accuracy_score, " Validation Error: ", val_error)
 
 ### Compute ratio of the number of support samples to the total number of training samples for classifier
 num_support_vectors = len(classifier.support_)
@@ -108,19 +82,12 @@ print("Support Vector Ratio: ", support_vector_ratio)
 ### Report the classification error for Test Data
 test_accuracy_score = accuracy_score(y_test, y_test_pred)
 test_error = np.mean(y_test_pred != y_test)
-print("Test Accuracy: ", test_accuracy_score)
-print("Test Error: ", test_error)
+print("Test Accuracy: ", test_accuracy_score, " Test Error: ", test_error)
 
 ### Report the 10-class confusion matrix on the test data
 from sklearn.metrics import confusion_matrix
 conf_matrix = confusion_matrix(y_test, y_test_pred)
 print("Confusion Matrix:\n", conf_matrix)
-
-### "Do you notice any patterns about what kind of mistakes are being made?"
-#### Answer: Based on the confusion matrix, it seems that our model is always predicting the class label of '9'
-### " Can you explain these mistakes intuitively?"
-#### Looking at our SVM hyperparameters and Training/Test outputs, we see that we had a large number of support vectors. This is a key indication of overfitting. 
-#### 
 
 ## Part (g)
 ### Applying GridSearchCV on SVC 
