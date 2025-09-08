@@ -23,6 +23,10 @@ y_val = val.targets.numpy()
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after converting to numpy")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
+### Normalize Data
+X_train = X_train.astype(np.float64) / 255.0
+X_val = X_val.astype(np.float64) / 255.0
+
 ### Given X and y, where X contains training samples and y contains labels, keep only 50% of each class! 
 def downsample(X, y):
     # Store downsampled X and y
@@ -43,12 +47,6 @@ X_train, y_train = downsample(X_train, y_train)
 X_val, y_val = downsample(X_val, y_val)
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after downsampling")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
-
-### Some sanity checks
-assert X_train.max() == 255
-assert X_train.min() == 0
-assert X_val.max() == 255
-assert X_val.min() == 0
 
 ## Plot the images of a few images in the dataset just to see if label is right
 # Function to plot a grid of images with labels
@@ -490,11 +488,6 @@ def test_backward_embedding_random_indices():
         check_backward_embedding(t, indices_W, indices_b, indices_h)
 
 ## part (g)
-### Dataset already loaded from part (a)
-### Divide by 255 for training stability
-X_train = X_train.astype(np.float32) / 255.0
-X_val = X_val.astype(np.float32) / 255.0
-
 ### Initialize all Layers
 l1, l2, l3, l4 = embedding_t(), linear_t(), relu_t(), softmax_cross_entropy_t()
 net = [l1, l2, l3, l4]
