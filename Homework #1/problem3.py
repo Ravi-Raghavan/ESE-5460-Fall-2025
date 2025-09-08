@@ -787,3 +787,7 @@ plt.title('Validation Error vs Iteration')
 plt.legend()
 plt.grid(True)
 plt.savefig('validation_error_plot_torch.png', dpi=300)
+
+# Print Final Metrics
+print(f"Final Training Error: {training_errors[-1]}, Final Training Loss: {training_losses[-1]}")
+print(f"Final Validation Error: {validation_errors[-1]}, Final Validation Loss: {validation_losses[-1]}")
