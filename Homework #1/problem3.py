@@ -354,6 +354,7 @@ def test_backward_relu_random_indices():
         # Run the gradient check for this k
         check_backward_relu(k, indices_h)
 
+test_backward_relu_random_indices()
 
 ### Test softmax_cross_entropy_t Function
 def softmax_cross_entropy_utility(hl, y):
@@ -405,6 +406,7 @@ def test_backward_softmax_random_indices():
     # Run the gradient check for this k
     check_backward_softmax(indices_h)
     
+test_backward_softmax_random_indices()
 
 ### Test embedding_t Function
 def embedding_utility(hl, W, b):
