@@ -527,7 +527,7 @@ training_losses = []
 training_errors = []
 validation_losses = []
 validation_errors = []
-epochs = 15000
+epochs = 10000
 for t in range(epochs):
     # 1. sample a mini-batch of size = 32
     # each image in the mini-batch is chosen uniformly randomly from the
@@ -556,15 +556,15 @@ for t in range(epochs):
     dw1, db1 = l1.dw, l1.db
     dw2, db2 = l2.dw, l2.db
     
-    # Store training loss/error every 100 weight updates
-    if (t + 1) % 100 == 0:
+    # Store training loss/error every 10 weight updates
+    if (t + 1) % 10 == 0:
         training_loss, training_error = validate(l1.w, l1.b, l2.w, l2.b, X_train, y_train, B)
         print(f"Epoch: {t + 1}, Training Loss: {training_loss}, Training Error: {training_error}")
         training_losses.append(training_loss)
         training_errors.append(training_error)
     
     # 6. Store validation loss/error every 1000 weight updates
-    if (t + 1) % 1000 == 0:
+    if (t + 1) % 100 == 0:
         validation_loss, validation_error = validate(l1.w, l1.b, l2.w, l2.b, X_val, y_val, B)
         print(f"Epoch: {t + 1}, Validation Loss: {validation_loss}, Validation Error: {validation_error}")
         validation_losses.append(validation_loss)
@@ -666,7 +666,7 @@ class NN(nn.Module):
 ## Hyperparameters
 batch_size = 32
 lr = 0.1
-epochs = 15000
+epochs = 10000
 
 # Convert NumPy arrays to torch tensors
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
@@ -738,13 +738,13 @@ for epoch in range(epochs):
     loss.backward()
     optimizer.step()
     
-    if (epoch + 1) % 100 == 0:
+    if (epoch + 1) % 10 == 0:
         avg_train_loss, avg_train_error = validate_torch(X_train_tensor, y_train_tensor)
         print(f"Epoch: {epoch + 1}, Training Loss: {avg_train_loss}, Training Error: {avg_train_error}")
         training_losses.append(avg_train_loss)
         training_errors.append(avg_train_error)
 
-    if (epoch + 1) % 1000 == 0:
+    if (epoch + 1) % 100 == 0:
         avg_val_loss, avg_val_error = validate_torch(X_val_tensor, y_val_tensor)
         print(f"Epoch: {epoch + 1}, Validation Loss: {avg_val_loss}, Validation Error: {avg_val_error}")
         validation_losses.append(avg_val_loss)

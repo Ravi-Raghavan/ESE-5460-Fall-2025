@@ -52,7 +52,8 @@ Collaborators: N/A
 \end{array}
         \end{align}
 
-    where $C$ is a hyperparameter and our optimization variables are $\theta, \theta_0, \xi_1, \cdots, \xi_n$. From \eqref{eq:1a-1}, we observe that a larger value of $C$ places a stronger penalty on slack, reducing the margin and prioritizing correct classification of training points. Conversely, a smaller value of $C$ allows more slack, resulting in a wider margin and greater tolerance for misclassifications.  
+    where $C$ is a hyperparameter and our optimization variables are $\theta, \theta_0, \xi_1, \cdots, \xi_n$. \\
+    \noindent From \eqref{eq:1a-1}, we observe that a larger value of $C$ places a stronger penalty on slack, reducing the margin and prioritizing correct classification of training points. Conversely, a smaller value of $C$ allows more slack, resulting in a wider margin and greater tolerance for misclassifications.  
 
 \textbf{\underline{Answer:}} The objective function is $\frac{1}{2} \|\theta\|^2 +  C \sum_{i = 1}^n \xi_i$, where $C$ is a hyperparameter as described above
 
@@ -68,7 +69,7 @@ Collaborators: N/A
 
     % https://chatgpt.com/c/68bb1aad-1140-832b-918c-fa8c29b1b32d
     % https://www.csie.ntu.edu.tw/~cjlin/papers/libsvm.pdf
-    \noindent In the Soft Margin case, support samples can lie on the margin, inside the margin boundaries, or even be a misclassified point. 
+    \noindent In the Soft Margin case, support samples can lie on the margin, within the margin boundaries, or even be a misclassified point. 
     \item[(c)] Check Code
     
     %C-SVM:https://www.csie.ntu.edu.tw/~cjlin/papers/libsvm.pdf
@@ -85,46 +86,46 @@ Collaborators: N/A
     When running the given SVM Classifier, here are the experimental results \\
     \textbf{Experimental Results:}
     \begin{itemize}
-        \item Training Accuracy: $1$
-        \item Training Error: $0$
-        \item Validation Accuracy: $0.0875$
-        \item Validation Error: $0.9125$
-        \item Support Vector Ratio: $1.0$
-        \item Test Accuracy: $\approx 0.1014$
-        \item Test Error: $\approx 0.8986$
+        \item Training Accuracy: 
+        \item Training Error: 
+        \item Validation Accuracy: 
+        \item Validation Error: 
+        \item Support Vector Ratio: 
+        \item Test Accuracy: 
+        \item Test Error: 
     \end{itemize}
 
-    \begin{figure}[h!]
-        \centering
-        \includegraphics[width=0.5\linewidth]{confusion_matrix_1d.png}
-        \caption{Confusion Matrix}
-        \label{fig:placeholder}
-    \end{figure}
+    % \begin{figure}[h!]
+    %     \centering
+    %     \includegraphics[width=0.5\linewidth]{confusion_matrix_1d.png}
+    %     \caption{Confusion Matrix}
+    %     \label{fig:placeholder}
+    % \end{figure}
 
-\textbf{Identifying the Pattern:} \\
-From the confusion matrix, we can see that the SVM classifier predicts only $9$ for all test samples, which is the clear pattern here.  \\
+% \textbf{Identifying the Pattern:} \\
+% From the confusion matrix, we can see that the SVM classifier predicts only $9$ for all test samples, which is the clear pattern here.  \\
 
-\textbf{Intuitive Explanation: } \\
-To understand this behavior, we examine the classifier's hyperparameters, starting with $\gamma$. By default, $\gamma = \tfrac{1}{n_{\text{features}} \cdot X.var()}$, but in our case we set $\gamma = \text{auto}$, which instead uses $\gamma = \tfrac{1}{n_{\text{features}}}$. For our dataset, $X.var() \approx 5164$, so choosing $\gamma = \text{auto}$ made our $\gamma$ value about $5164$ times larger than the default. From our earlier discussion, we know that having a higher $\gamma$ value restricts each point's influence to a narrow area, enabling the model to fit the training data closely, which can increase overfitting and reduce generalization. \\
+% \textbf{Intuitive Explanation: } \\
+% To understand this behavior, we examine the classifier's hyperparameters, starting with $\gamma$. By default, $\gamma = \tfrac{1}{n_{\text{features}} \cdot X.var()}$, but in our case we set $\gamma = \text{auto}$, which instead uses $\gamma = \tfrac{1}{n_{\text{features}}}$. For our dataset, $X.var() \approx 5164$, so choosing $\gamma = \text{auto}$ made our $\gamma$ value about $5164$ times larger than the default. From our earlier discussion, we know that having a higher $\gamma$ value restricts each point's influence to a narrow area, enabling the model to fit the training data closely, which can increase overfitting and reduce generalization. \\
 
 \noindent \textbf{Extra: Improving Performance by Tweaking $\gamma$ to $\text{scale}$} \\
 \textbf{Experimental Results:}
     \begin{itemize}
-        \item Training Accuracy: $0.98125$
-        \item Training Error: $0.01875$
-        \item Validation Accuracy: $0.96$
-        \item Validation Error: $0.04$
-        \item Support Vector Ratio: $0.380375$
-        \item Test Accuracy: $\approx 0.9578$
-        \item Test Error: $\approx 0.0422$
+        \item Training Accuracy: 
+        \item Training Error: 
+        \item Validation Accuracy: 
+        \item Validation Error: 
+        \item Support Vector Ratio: 
+        \item Test Accuracy: 
+        \item Test Error: 
     \end{itemize}
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.5\linewidth]{confusion_matrix_1d_2.png}
-    \caption{Confusion Matrix}
-    \label{fig:placeholder}
-\end{figure}
+% \begin{figure}[h!]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{confusion_matrix_1d_2.png}
+%     \caption{Confusion Matrix}
+%     \label{fig:placeholder}
+% \end{figure}
 
 \item[(e)] We will list out the parameters from Scikit-learn and analyze each of them: 
 \begin{itemize}
@@ -149,13 +150,69 @@ To understand this behavior, we examine the classifier's hyperparameters, starti
 \end{solution}
 
 \clearpage
-\begin{solution}[Time spent: 1 hour]
-Your solution goes here.
+% https://stanford.edu/class/ee364b/lectures/subgradients_notes.pdf
+\begin{solution}[Time spent: 20 minutes] \\
+Since $\varphi$ is convex and finite, its subdifferential (i.e., the set of all subgradients) at $\mu$ is defined as
+\[
+\partial \varphi(\mu) := \{\, y \in \mathbb{R}^n : \varphi(x) \geq \varphi(\mu) + y^\top (x - \mu) \;\; \text{for all } x \in \mathbb{R}^n \,\},
+\]
+and is guaranteed to be \textbf{\underline{nonempty}}, provided that $\mu \in \operatorname{int}(\operatorname{dom}\varphi)$. \\
+
+\noindent \textit{Note: If $\mu$ lies on the boundary of the domain, the subgradient inequality is trivial, since the right-hand side can go to $-\infty$. Therefore, for the remainder of the proof, we assume $\mu \in \operatorname{int}(\operatorname{dom}\varphi)$.} \\
+
+
+
+\noindent We begin by denoting an arbitrary subgradient $g \in \partial \varphi(\mu)$. By definition of a subgradient, we have
+\[
+\varphi(x)\ge \varphi(\mu)+ g^\top \left(x-\mu\right)
+\]
+for all $x \in \mathbb{R}^n$ \\
+
+Applying the above inequality to the random vector \(X\) gives us the following
+\[
+\varphi(X)\ge \varphi(\mu)+ g^\top \left(X-\mu\right)
+\]
+
+Taking Expectation of both sides of the inequality gives us 
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \mathbf{E} \left[ \varphi(\mu)+ g^\top \left(X-\mu\right) \right]
+\]
+
+Using Linearity of Expectation, we see that
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \mathbf{E} \left[ \varphi(\mu) \right] + \mathbf{E} \left[ g^\top \left(X-\mu\right) \right]
+\]
+
+We use Linearity of Expectation on $\mathbf{E} \left[ g^\top \left(X-\mu\right) \right]$ to further simplify
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \mathbf{E} \left[ \varphi(\mu) \right] + g^\top \cdot \mathbf{E} \left[\left(X-\mu\right) \right]
+\]
+
+Using Linearity of Expectation on $\mathbf{E} \left[\left(X-\mu\right) \right]$, we simplify 
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \mathbf{E} \left[ \varphi(\mu) \right] + g^\top \cdot \left( \mathbf{E} \left[X \right] - \mathbf{E} \left[\mu \right] \right)
+\]
+
+Finally, we use the fact that $\varphi(\mu)$ and $\mu$ are deterministic and that \(\mathbb{E}[X]=\mu\) to simplify
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \varphi(\mu) + g^\top \cdot \left( \mu - \mu \right)
+\]
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \varphi(\mu) + g^\top \cdot \left( 0 \right)
+\]
+\[
+\mathbf{E} \left[ \varphi(X) \right]\ge \varphi(\mu)
+\]
+
+This proves the claimed inequality.
+
 \end{solution}
 
 \clearpage
 \begin{solution}[Time spent: 1 hour]
-Your solution goes here.
+\begin{enumerate}
+    \item[(a)]
+\end{enumerate}
 \end{solution}
 
 \end{document}

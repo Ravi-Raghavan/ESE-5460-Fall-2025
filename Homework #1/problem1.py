@@ -48,7 +48,7 @@ x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_st
 
 ## Part (d)
 from sklearn import svm
-classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'auto')
+classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
 
 ### Fit to training data
 classifier.fit(x_train, y_train)
@@ -140,59 +140,71 @@ from skimage.filters import gabor_kernel , gabor
 import matplotlib.pyplot as plt
 freq, theta, bandwidth = 0.1, np.pi/4, 1
 gk = gabor_kernel(frequency=freq, theta=theta, bandwidth=bandwidth)
-plt.figure(1); plt.clf(); plt.imshow(gk.real); plt.show()
-plt.figure(2); plt.clf(); plt.imshow(gk.imag); plt.show()
+plt.figure(1); plt.clf(); plt.imshow(gk.real); plt.title("Real Gabor Coefficients"); plt.savefig("real_coeff_gabor.png")
+plt.figure(2); plt.clf(); plt.imshow(gk.imag); plt.title("Imaginary Gabor Coefficients"); plt.savefig("img_coeff_gabor.png")
 
 # convolve the input image with the kernel and get co-efficients
 # we will use only the real part and throw away the imaginary
 # part of the co-efficients
 image = x[0].reshape((14,14))
-plt.figure(1); plt.clf(); plt.imshow(image); plt.show()
+plt.figure(3); plt.clf(); plt.title("Sample Image"); plt.imshow(image); plt.savefig("img_0.png")
 
 coeff_real, _ = gabor(image, frequency=freq, theta=theta, bandwidth=bandwidth)
-plt.figure(1); plt.clf(); plt.imshow(coeff_real); plt.show()
+plt.figure(4); plt.clf(); plt.title("Real Coefficients of Gabor Convolution"); plt.imshow(coeff_real); plt.savefig("real_coeff_img_0.png")
 
 ## Part (j)
-theta = np.arange(0,np.pi,np.pi/4)
-frequency = np.arange(0.05,0.5,0.15)
-bandwidth = np.arange(0.3,1,0.3)
+thetas = np.arange(0,np.pi,np.pi/4)
+frequencies = np.arange(0.05,0.5,0.15)
+bandwidths = np.arange(0.3,1,0.3)
 
-filters = []
-for i in theta:
-    for j in frequency:
-        for k in bandwidth:
-            filters.append((i, j, k))
-
+# Create Filter Matrix where each row is a filter
+T, F, B = np.meshgrid(thetas, frequencies, bandwidths, indexing="ij")
+filters = np.column_stack([T.ravel(), F.ravel(), B.ravel()])
 print(f"Total filters: {len(filters)}")  # should be 36
 
 # Plotting filter bank
-fig, axes = plt.subplots(len(theta), len(frequency) * len(bandwidth), figsize=(18, 6))
+fig, axes = plt.subplots(len(thetas), len(frequencies) * len(bandwidths), figsize=(18, 6))
 axes = axes.ravel()
 
-for i, (theta, freq, bw) in enumerate(filters):
+for i, filter in enumerate(filters):
+    theta, freq, bw = filter[0], filter[1], filter[2]
     kernel = np.real(gabor_kernel(frequency=freq, theta=theta, bandwidth=bw))
     axes[i].imshow(kernel, cmap='gray')
     axes[i].set_title(f"θ={theta:.2f}, f={freq:.2f}, bw={bw:.2f}", fontsize=8)
     axes[i].axis("off")
 
+fig.suptitle("Gabor Filter Bank")  # global title
 plt.tight_layout()
-plt.show()
+plt.savefig("gabor_filter_bank.png")
 
+# Define function to extract gabor features given images, filter bank
+def extract_gabor_features(images, filters, img_shape=(14, 14)):
+    n_imgs = len(images)
+    n_filters = len(filters)
+    n_feats_per_filter = img_shape[0] * img_shape[1]
 
-# Extract Gabor Features from images using the Gabor Filter Bank
-def extract_gabor_features(images, filters):
-    feats = []
-    for img in images:
-        img_feats = []
-        for theta, freq, bw in filters:
-            real, imag = gabor(img, frequency=freq, theta=theta, bandwidth=bw)
-            img_feats.extend(real.flatten())
-        feats.append(img_feats)
-    return np.array(feats)
+    # Pre-allocate output array
+    feats = np.empty((n_imgs, n_filters * n_feats_per_filter), dtype=np.float32)
 
+    for i, img in enumerate(images):
+        print(f"Index: {i}")
+        img_reshaped = img.reshape(img_shape)
+
+        # Collect features for all filters
+        img_feats = [
+            gabor(img_reshaped, frequency=freq, theta=theta, bandwidth=bw)[0].ravel()
+            for theta, freq, bw in filters
+        ]
+
+        feats[i, :] = np.concatenate(img_feats)
+
+    return feats
+
+# Extract gabor features for train + test
 X_train_feats = extract_gabor_features(x_train, filters)
-X_test_feats = extract_gabor_features(x_test, filters)
+X_test_feats  = extract_gabor_features(x_test, filters)
 
+print("Finished extracting Gabor Features")
 
 # Run PCA
 from sklearn.decomposition import PCA
