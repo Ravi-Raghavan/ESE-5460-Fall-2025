@@ -492,9 +492,16 @@ def test_backward_embedding_random_indices():
         # Run the gradient check for this k
         check_backward_embedding(t, indices_W, indices_b, indices_h)
 
-## part (g)
+test_backward_embedding_random_indices()
+
+## part (g) and (h)
 ### Initialize all Layers
 l1, l2, l3, l4 = embedding_t(), linear_t(), relu_t(), softmax_cross_entropy_t()
+
+### Store initial weights
+l1_weights_init, l1_bias_init = l1.w, l1.b
+l2_weights_init, l2_bias_init = l2.w, l2.b
+
 net = [l1, l2, l3, l4]
 print("Part g: Print shapes of X_train, y_train, X_val, and y_val again")
 print(f"X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}, X_val shape -> {X_val.shape}, y_val shape: {y_val.shape}")
@@ -531,11 +538,17 @@ training_errors = []
 validation_losses = []
 validation_errors = []
 epochs = 10000
+
+### Store order of batches
+batch_indices = np.empty((epochs, B), dtype=np.int64)
+for i in range(epochs):
+    batch_indices[i] = np.random.choice(X_train.shape[0], size=B, replace=False)
+
 for t in range(epochs):
     # 1. sample a mini-batch of size = 32
     # each image in the mini-batch is chosen uniformly randomly from the
     # training dataset
-    indices = np.random.choice(X_train.shape[0], size=B, replace=False)
+    indices = batch_indices[t, :].flatten()
     X_train_batch = X_train[indices]
     y_train_batch = y_train[indices]
 
@@ -619,18 +632,26 @@ plt.legend()
 plt.grid(True)
 plt.savefig('validation_error_plot_ravi.png', dpi=300)
 
+# Store Final Metrics
+import pandas as pd
+final_metrics = {
+    "Training Error": [training_errors[-1]],
+    "Training Loss": [training_losses[-1]],
+    "Validation Error": [validation_errors[-1]],
+    "Validation Loss": [validation_losses[-1]]
+}
 
-# Print Final Metrics
-print(f"Final Training Error: {training_errors[-1]}, Final Training Loss: {training_losses[-1]}")
-print(f"Final Validation Error: {validation_errors[-1]}, Final Validation Loss: {validation_losses[-1]}")
+# Convert to DataFrame
+df = pd.DataFrame(final_metrics)
+
+# Save to CSV
+df.to_csv("final_metrics_ravi.csv", index=False)
 
 ### Part (i): Test Implementation using PyTorch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader
-torch.manual_seed(random_state)
 
 # Define class for Embedding Layer
 class EmbeddingLayer(nn.Module):
@@ -643,6 +664,14 @@ class EmbeddingLayer(nn.Module):
             stride = 4,
             bias = True
         )
+
+        self._init_weights()
+    
+    def _init_weights(self):
+        with torch.no_grad():
+            l1_weights_init_reshaped = l1_weights_init.transpose(2, 0, 1)[:, None, :, :]
+            self.conv.weight.copy_(torch.from_numpy(l1_weights_init_reshaped))
+            self.conv.bias.copy_(torch.from_numpy(l1_bias_init))
     
     # x: B X 28 X 28
     def forward(self, x):
@@ -658,6 +687,12 @@ class NN(nn.Module):
         super(NN, self).__init__()
         self.embed = EmbeddingLayer()
         self.fc = nn.Linear(392, 10)
+        self._init_fc()
+    
+    def _init_fc(self):
+        with torch.no_grad():
+            self.fc.weight.copy_(torch.from_numpy(l2_weights_init))
+            self.fc.bias.copy_(torch.from_numpy(l2_bias_init))
     
     def forward(self, x):
         x = self.embed(x)
@@ -676,13 +711,6 @@ X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train, dtype=torch.long)
 X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
 y_val_tensor = torch.tensor(y_val, dtype=torch.long)
-
-# Create TensorDataset and DataLoader
-train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # Set up model, loss function, and optimizer
 model = NN()
@@ -728,7 +756,7 @@ for epoch in range(epochs):
     model.train()
     
     # Randomly sample a batch
-    indices = torch.randint(0, X_train.shape[0], (batch_size,))
+    indices = batch_indices[epoch, :].flatten()
     batch_X = X_train_tensor[indices]
     batch_y = y_train_tensor[indices]
     
@@ -792,5 +820,15 @@ plt.grid(True)
 plt.savefig('validation_error_plot_torch.png', dpi=300)
 
 # Print Final Metrics
-print(f"Final Training Error: {training_errors[-1]}, Final Training Loss: {training_losses[-1]}")
-print(f"Final Validation Error: {validation_errors[-1]}, Final Validation Loss: {validation_losses[-1]}")
+final_metrics = {
+    "Training Error": [training_errors[-1]],
+    "Training Loss": [training_losses[-1]],
+    "Validation Error": [validation_errors[-1]],
+    "Validation Loss": [validation_losses[-1]]
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(final_metrics)
+
+# Save to CSV
+df.to_csv("final_metrics_torch.csv", index=False)
