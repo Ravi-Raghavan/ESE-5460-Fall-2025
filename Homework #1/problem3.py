@@ -51,22 +51,24 @@ print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 ## Plot the images of a few images in the dataset just to see if label is right
 # Function to plot a grid of images with labels
 import matplotlib.pyplot as plt
-def plot_images(X, y, start, plot):
-    if not plot:
-        return
+def plot_images_random(X, y, file_title, fig_title=None, n_images=16):
+    indices = np.random.choice(len(X), size=n_images, replace=False)
     plt.figure(figsize=(8, 8))
-    for i in range(start, start + 16):
-        offset = i - start
-        plt.subplot(4, 4, offset+1)
-        plt.imshow(X[i], cmap='gray')
-        plt.title(f"Label: {y[i]}")
+
+    if fig_title:
+        plt.suptitle(fig_title, fontsize=16)
+
+    for i, idx in enumerate(indices):
+        plt.subplot(4, 4, i+1)
+        plt.imshow(X[idx], cmap='gray')
+        plt.title(f"Label: {y[idx]}")
         plt.axis('off')
     plt.tight_layout()
-    plt.show()
+    plt.savefig(file_title, dpi=300)
 
 # Plot first 16 images from the downsampled training set
-plot_images(X_train, y_train, 25000, False)
-plot_images(X_val, y_val, 25000, False)
+plot_images_random(X_train, y_train, "3a_train_images.png", "Training Images w/ Labels")
+plot_images_random(X_val, y_val, "3a_val_images.png", "Validation Images w/ Labels")
 
 ## Problem 3, Part (b)
 class embedding_t:
@@ -153,10 +155,9 @@ class linear_t:
         self.b = np.random.normal(loc = mean, scale = std, size = (10,))
 
         # normalize to make the Frobenius norm of (w, b) equal to 1
-        eps = 1e-12
         fro_norm = np.sqrt(np.sum(self.w ** 2) + np.sum(self.b ** 2))
-        self.w = self.w / (fro_norm + eps)
-        self.b = self.b / (fro_norm + eps)
+        self.w = self.w / fro_norm
+        self.b = self.b / fro_norm
     
     def zero_grad(self):
         # useful to delete the stored backprop gradients of the previous mini-batch before you start a new mini-batch
