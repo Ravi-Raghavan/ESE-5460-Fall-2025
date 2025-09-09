@@ -152,13 +152,15 @@ Collaborators: N/A
 \clearpage
 % https://stanford.edu/class/ee364b/lectures/subgradients_notes.pdf
 \begin{solution}[Time spent: 20 minutes] \\
-Since $\varphi$ is convex and finite, its subdifferential (i.e., the set of all subgradients) at $\mu$ is defined as
+Since $\varphi$ is convex, its subdifferential (i.e., the set of all subgradients) at $\mu$ is defined as
 \[
 \partial \varphi(\mu) := \{\, y \in \mathbb{R}^n : \varphi(x) \geq \varphi(\mu) + y^\top (x - \mu) \;\; \text{for all } x \in \mathbb{R}^n \,\},
 \]
-and is guaranteed to be \textbf{\underline{nonempty}}, provided that $\mu \in \operatorname{int}(\operatorname{dom}\varphi)$. \\
+and is guaranteed to be \textbf{\underline{non-empty}}, provided that $\mu \in \operatorname{int}(\operatorname{dom}\varphi)$. \\
 
-\noindent \textit{Note: If $\mu$ lies on the boundary of the domain, the subgradient inequality is trivial, since the right-hand side can go to $-\infty$. Therefore, for the remainder of the proof, we assume $\mu \in \operatorname{int}(\operatorname{dom}\varphi)$.} \\
+\noindent \textit{Note: Since the problem statement does not specify, I assume that the domain of $\varphi$ is $\mathbb{R}^n$} \\
+\noindent \textit{Note: If $\mu$ lies on the boundary of the domain of $\varphi$, the subgradient inequality is trivial, as the right-hand side can become arbitrarily negative while $\varphi$ remains finite, implying that subgradients exist at such boundary points. For practicality, and to avoid dealing with $\mu$ being effectively infinite, we assume for the remainder of the proof that $\mu \in \operatorname{int}(\operatorname{dom}\varphi)$.} \\
+
 
 
 
@@ -211,7 +213,7 @@ This proves the claimed inequality.
 \clearpage
 \begin{solution}[Time spent: 1 hour]
 \begin{enumerate}
-    \item[(a)]
+    \item[(a)] 
 \end{enumerate}
 \end{solution}
 
