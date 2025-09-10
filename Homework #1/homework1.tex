@@ -171,19 +171,14 @@ Collaborators: N/A
 \clearpage
 % https://stanford.edu/class/ee364b/lectures/subgradients_notes.pdf
 % https://stanford.edu/class/ee364b/lectures/subgradients_slides.pdf
-\begin{solution}[Time spent: 20 minutes] \\
-Since $\varphi$ is convex, finite, and has a non-empty domain, its subdifferential at $\mu$, defined by  
+\begin{solution}[Time spent: 10 minutes] \\
+In what follows, we establish Jensen’s Inequality in the more general setting where $X$ takes values in an infinite set. As per the problem statement, we assume that $\varphi$ is differentiable \\
+
+\noindent Denote \( g = \nabla \varphi(\mu) \).  
+By the first-order characterization of convexity, we have
 \[
-\partial \varphi(\mu) := \{\, y \in \mathbb{R}^n : \varphi(x) \geq \varphi(\mu) + y^\top (x - \mu) \;\; \text{for all } x \in \mathbb{R}^n \,\},
-\]  
-is guaranteed to be \textbf{\underline{non-empty}} whenever $\mu \in \textbf{relint}(\textbf{dom}\,\varphi)$. \\
-
-
-\noindent \textit{Note: Since the problem statement does not specify, I assume that the domain of $\varphi$ is $\mathbb{R}^n$. Consequently, $\textbf{relint}(\textbf{dom } \varphi) = \mathbb{R}^n$. This ensures that $\mu \in \textbf{relint}(\textbf{dom } \varphi)$, so $\partial \varphi(\mu)$ is non-empty.} \\
-
-\noindent We begin by denoting an arbitrary subgradient $g \in \partial \varphi(\mu)$. By definition of a subgradient, we have
-\[
-\varphi(x)\ge \varphi(\mu)+ g^\top \left(x-\mu\right),\, \forall x \in \mathbb{R}^n
+\varphi(x)\geq \varphi(\mu) + g^\top (x - \mu), 
+\quad \forall x \in \mathbb{R}^n.
 \]
 
 Applying the above inequality to the random vector \(X\) gives us the following
