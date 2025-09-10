@@ -172,11 +172,12 @@ Collaborators: N/A
 % https://stanford.edu/class/ee364b/lectures/subgradients_notes.pdf
 % https://stanford.edu/class/ee364b/lectures/subgradients_slides.pdf
 \begin{solution}[Time spent: 20 minutes] \\
-Since $\varphi$ is convex, its subdifferential (i.e., the set of all subgradients) at $\mu$ is defined as
+Since $\varphi$ is convex and finite, its subdifferential at $\mu$, defined by  
 \[
 \partial \varphi(\mu) := \{\, y \in \mathbb{R}^n : \varphi(x) \geq \varphi(\mu) + y^\top (x - \mu) \;\; \text{for all } x \in \mathbb{R}^n \,\},
-\]
-and is guaranteed to be \textbf{\underline{non-empty}}, provided that $\mu \in \textbf{relint}(\textbf{dom} \varphi)$. \\
+\]  
+is guaranteed to be \textbf{\underline{non-empty}} whenever $\mu \in \textbf{relint}(\textbf{dom}\,\varphi)$. \\
+
 
 \noindent \textit{Note: Since the problem statement does not specify, I assume that the domain of $\varphi$ is $\mathbb{R}^n$. Consequently, $\textbf{relint}(\textbf{dom } \varphi) = \mathbb{R}^n$. This ensures that $\mu \in \textbf{relint}(\textbf{dom } \varphi)$, so $\partial \varphi(\mu)$ is non-empty.} \\
 
@@ -845,6 +846,130 @@ In matrix form, with $Y\in\{0,1\}^{B\times C}$ the one-hot encoding of the label
 \item[(f)]
 
 \textbf{\underline{Embedding Layer}} \\
+Here is the code I used to check whether the Backward Pass was working for the Embedding Layer
+\begin{python}
+    ### Test embedding_t Function
+def embedding_utility(hl, W, b):
+    # Store Batch Value
+    B = hl.shape[0]
+
+    # We denote dimension of hl as B X 28 X 28 where B is the batch size
+    # Step 1: Convert hl to B X 28 X 28 X 1
+    hl = hl[:, :, :, None]
+
+    # Step 2: Convert hl to B X 28 X 28 X 8
+    hl = np.repeat(hl, repeats = 8, axis = -1)
+
+    # Step 3: Form Sliding Windows: Shape is B x 25 x 25 x 1 x 4 x 4 x 8
+    sliding_windows = np.lib.stride_tricks.sliding_window_view(hl, window_shape = (4, 4, 8), axis = (1, 2, 3))
+    
+    # Step 4: To capture Stride in our convolution, subset windows and we now have B x 7 x 7 x 4 x 4 x 8
+    sliding_windows = sliding_windows[:, ::4, ::4, 0]
+
+    # Step 5: Element-wise multiplication to get output of B x 7 x 7 x 8
+    hl_plus_1 = (sliding_windows * W).sum(axis = (3, 4)) + b
+
+    # Step 6: Convert to B x 392
+    hl_plus_1 = hl_plus_1.reshape(B, -1)
+
+    return hl_plus_1
+
+def check_backward_embedding(t, indices_W, indices_b, indices_h):
+    layer = embedding_t()
+    hl = np.random.randn(1, 28, 28)
+
+    # Compute forward pass
+    layer.forward(hl)
+
+    # Set up backward pass
+    W = layer.w # Shape: 4 x 4 x 8
+    b = layer.b # Shape: (8,)
+
+    # Set up dhl_plus_1
+    dhl_plus_1 = np.zeros(shape = (1, 392))
+    dhl_plus_1[0, t] = 1 # Shape: 1 x 392
+
+    # Compute backward
+    dhl = layer.backward(dhl_plus_1)
+    dw = layer.dw # Shape: 4 x 4 x 8
+    db = layer.db # Shape: (8,)
+
+    # Verify dw
+    for i, j, k in indices_W:
+        eps = np.zeros(shape = W.shape)
+        eps[i, j, k] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_W = (embedding_utility(hl, W + eps, b) - embedding_utility(hl, W - eps, b))[0, t] / (2 * eps)[i, j, k]
+        np.testing.assert_allclose(dw[i, j, k], deriv_W, rtol=1e-6, atol=1e-6)
+    
+    for i in indices_b:
+        eps = np.zeros(shape = b.shape)
+        eps[i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_b = (embedding_utility(hl, W, b + eps) - embedding_utility(hl, W, b - eps))[0, t] / (2 * eps)[i]
+        np.testing.assert_allclose(db[i], deriv_b, rtol=1e-6, atol=1e-6)
+    
+    for i, j in indices_h:
+        eps = np.zeros(shape = hl.shape)
+        eps[0, i, j] = np.random.normal(loc = 0.0, scale = 1e-8)
+        deriv_h = (embedding_utility(hl + eps, W, b) - embedding_utility(hl - eps, W, b))[0, t] / (2 * eps)[0, i, j]
+        np.testing.assert_allclose(dhl[0, i, j], deriv_h, rtol=1e-6, atol=1e-6)
+
+def test_backward_embedding_random_indices():
+    rng = np.random.default_rng() # Set seed for reproducability
+
+    # Sample 5 values of k
+    t_values = rng.choice(10, size=5, replace=False)
+
+    for t in t_values:
+        # For W (4 x 4 x 8), pick 10 random (i, j) pairs
+        indices_W = [(rng.integers(0, 4), rng.integers(0, 4), rng.integers(0, 8)) for _ in range(10)]
+        
+        # For b (8,), pick 3 random indices
+        indices_b = rng.choice(8, size=3, replace=False).tolist()
+        
+        # For h (28, 28), pick 4 random indices
+        indices_h = [(rng.integers(0, 28), rng.integers(0, 28)) for _ in range(4)]
+
+        # Run the gradient check for this k
+        check_backward_embedding(t, indices_W, indices_b, indices_h)
+
+test_backward_embedding_random_indices()
+\end{python}
+
+\texttt{Note:} The input to the embedding layer is $h^{(\ell)} \in \mathbb{R}^{B \times 28 \times 28}$, where $B$ is the batch size.  
+The learnable parameters are the weight tensor $W \in \mathbb{R}^{4 \times 4 \times 8}$ and the bias vector $b \in \mathbb{R}^{8}$.  
+The output of the layer is flattened to $h^{(\ell+1)} \in \mathbb{R}^{B \times 392}$. \\
+
+\textbf{Numerical gradient approximation.} \\
+As with previous layers, we approximate gradients using the centered finite-difference method:
+\[
+\frac{\partial f}{\partial \theta} \approx \frac{f(\theta + \epsilon) - f(\theta - \epsilon)}{2\epsilon}, \quad \epsilon \sim \mathcal{N}(0,10^{-8}).
+\]
+This is applied separately to $W$, $b$, and $h^{(\ell)}$. \\
+
+\textbf{Verification procedure.}
+The function \verb|check_backward_embedding| performs:
+\begin{enumerate}
+  \item Initialize an \verb|embedding_t| layer and a random input $h^{(\ell)} \in \mathbb{R}^{1 \times 28 \times 28}$.
+  \item Run the forward pass: \verb|layer.forward(hl)|.
+  \item Select an output coordinate $t$ and set the upstream gradient \verb|dhl_plus_1| with $1$ at index $t$.
+  \item Run the backward pass to obtain gradients $dhl$, $dw$, and $db$.
+  \item For a set of random indices in $W$, $b$, and $h^{(\ell)}$, compute finite-difference approximations and compare against the analytical results using \verb|np.testing.assert_allclose|. \\
+\end{enumerate}
+
+\textbf{Randomized testing.}
+The function \verb|test_backward_embedding_random_indices| automates the process:
+\begin{itemize}
+  \item Samples $5$ random output coordinates $t$.
+  \item For each $t$:
+    \begin{itemize}
+      \item Selects $10$ random entries of $W$,
+      \item Selects $3$ random entries of $b$,
+      \item Selects $4$ random pixel coordinates of $h^{(\ell)}$.
+    \end{itemize}
+  \item Calls \verb|check_backward_embedding| for each case. \\
+\end{itemize}
+
+
 
 \textbf{\underline{Linear Layer}} \\
 Here is the code I used to check whether the Backward Pass was working for the Linear Layer
@@ -914,8 +1039,9 @@ def test_backward_linear_random_indices():
 test_backward_linear_random_indices()
 
 \end{python}
+In this test suite, we call the backward function with argument $\overline{h^{l + 1}} = \left[0, 0, \cdots, 0, 1, 0, 0, \cdots\right]$(i.e. there is a $1$ at the $k$th element). \\
 
-The backward pass computes
+Hence, the backward pass then computes
 \[
 \frac{\partial h^{(\ell+1)}_{k}}{\partial W_{ij}}, \quad
 \frac{\partial h^{(\ell+1)}_{k}}{\partial b_{i}}, \quad
@@ -1000,52 +1126,292 @@ def test_backward_relu_random_indices():
         
 test_backward_relu_random_indices()
 \end{python}
-\texttt{Note:} $h^{(\ell)}\in\mathbb{R}^{B\times 10}$ is the input (batch size $B$, dimension $10$). \\
+In this test suite, we call the backward function with argument $\overline{h^{l + 1}} = \left[0, 0, \cdots, 0, 1, 0, 0, \cdots\right]$(i.e. there is a $1$ at the $k$th element). \\
 
-The backward pass computes
+Hence, the backward pass then computes
 \[
-\frac{\partial h^{(\ell+1)}_{i,k}}{\partial h^{(\ell)}_{i,j}}
+\frac{\partial h^{(\ell+1)}_{k}}{\partial h^{(\ell)}_{j}},
+\]
+
+
+\textbf{Backward Pass}
+The derivative of ReLU with respect to its input is
+\[
+\frac{\partial h^{(\ell+1)}_{k}}{\partial h^{(\ell)}_{j}}
 = \begin{cases}
-1 & \text{if } j=k \text{ and } h^{(\ell)}_{i,j}>0, \\[6pt]
+1 & \text{if } j=k \text{ and } h^{(\ell)}_{j} > 0, \\[6pt]
 0 & \text{otherwise.}
 \end{cases}
 \]
-This means that the gradient flows only through positive activations, and is blocked (set to zero) when the input is negative. \\
+This means that the gradient is allowed to flow through coordinates where the input was positive, while it is completely blocked (set to zero) at negative inputs. \\
 
-\textbf{Numerical gradient approximation.}
-For a function $f(\theta)$ and a parameter $\theta_{ij}$, the derivative can be approximated using the centered finite-difference formula:
+\textbf{Numerical Gradient Approximation.}
+To validate the analytical gradient, we approximate it using the centered finite-difference method. For a scalar-valued function $f(\theta)$ and a parameter $\theta_{ij}$, the derivative is approximated as
 \[
 \frac{\partial f}{\partial \theta_{ij}}
-\approx \frac{f(\theta + \epsilon e_{ij}) - f(\theta - \epsilon e_{ij})}{2\epsilon},
+\;\approx\; \frac{f(\theta + \epsilon e_{ij}) - f(\theta - \epsilon e_{ij})}{2\epsilon},
 \]
-where $e_{ij}$ is a perturbation matrix with 1 at entry $(i,j)$ and zero elsewhere.  
-In my implementation, $\epsilon$ is chosen as a small Gaussian perturbation with variance $10^{-8}$. \\
+where $e_{ij}$ is a perturbation tensor with a $1$ at entry $(i,j)$ and zero elsewhere. In the implementation, $\epsilon$ is drawn from a small Gaussian distribution with variance $10^{-8}$ to ensure numerical stability. \\
 
-\textbf{Verification Procedure.}
-The function \verb|check_backward_relu| performs:
+\textbf{Verification procedure.} 
+The function \verb|check_backward_relu| performs the following steps:
 \begin{enumerate}
-  \item Initialize a \verb|relu_t| layer and sample a random input $h^{(\ell)}\in\mathbb{R}^{1\times 10}$.
+  \item Initialize a \verb|relu_t| layer and draw a random input $h^{(\ell)} \in \mathbb{R}^{1 \times 10}$.
   \item Run the forward pass: \verb|layer.forward(hl)|.
-  \item Select a specific output coordinate $k$ by setting up \verb|dhl_plus_1| with $1$ at index $k$.
-  \item Run the backward pass to compute
+  \item Choose an output coordinate $k$ and construct the upstream gradient \verb|dhl_plus_1| with a $1$ at index $k$ and zeros elsewhere.
+  \item Run the backward pass to compute the analytical gradient:
   \[
-  dhl = \frac{\partial h^{(\ell+1)}_{k}}{\partial h^{(\ell)}}.
+  dhl = \frac{\partial h^{(\ell+1)}_{k}}{\partial h^{(\ell)}_{i}}.
   \]
-  \item For a set of random input indices $i$, compute numerical derivatives using the finite-difference formula and compare them to the corresponding entries of \verb|dhl| using \verb|np.testing.assert_allclose|  \\
+  \item For several randomly chosen input indices $i$, perturb $h^{(\ell)}$ with $\pm \epsilon e_i$, compute the finite-difference approximation of the derivative, and compare it to the analytical gradient entries in \verb|dhl| using \verb|np.testing.assert_allclose|. \\
 \end{enumerate}
 
 \textbf{Randomized testing.}
-The driver function \verb|test_backward_relu_random_indices|:
+The driver function \verb|test_backward_relu_random_indices| automates the verification:
 \begin{itemize}
   \item Randomly samples 5 output coordinates $k$.
-  \item For each $k$, selects 4 random input indices $i$.
-  \item Calls \verb|check_backward_relu| to compare analytical and numerical gradients. \\
+  \item For each $k$, selects 4 random input coordinates $i$.
+  \item Calls \verb|check_backward_relu| to compare analytical and numerical gradients for the chosen indices. \\
 \end{itemize}
 
 
-
-
 \textbf{\underline{Softmax + Cross-Entropy Layer}} \\
+Here is the code I used to check whether the Backward Pass was working for the Softmax + Cross-Entropy Layer
+\begin{python}
+    ### Test softmax_cross_entropy_t Function
+def softmax_cross_entropy_utility(hl, y):
+    # Flatten y as sanity check 
+    y = y.flatten()
+
+    # Step 1: Compute hl_plus_1 after Softmax
+    exp_hl = np.exp(hl)
+    hl_plus_1 = exp_hl / np.sum(exp_hl, axis = 1, keepdims=True)
+    
+    # Step 2: Compute average loss over minibatch 
+    B = hl.shape[0]
+
+    # Pick the probabilities corresponding to correct labels
+    correct_probs = hl_plus_1[np.arange(B), y]
+    ell = -np.mean(np.log(correct_probs + 1e-12)) #Adding 1e-12 for numerical stability
+
+    y_pred = np.argmax(hl_plus_1, axis=1)
+    error = np.mean(y_pred != y)
+
+    return ell, error
+
+def check_backward_softmax(indices_h):
+    layer = softmax_cross_entropy_t()
+    hl = np.random.randn(1, 10)
+    y = np.random.randint(0, 10, size=(1,))
+
+    # Compute forward pass
+    layer.forward(hl, y)
+
+    # Compute backward
+    dhl = layer.backward()
+
+    for i in indices_h:
+        eps = np.zeros(shape = hl.shape)
+        eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
+        LHS, _ = softmax_cross_entropy_utility(hl + eps, y)
+        RHS, _ = softmax_cross_entropy_utility(hl - eps, y)
+        diff = LHS - RHS
+        deriv_h = diff / (2 * eps)[0, i]
+        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+
+def test_backward_softmax_random_indices():
+    rng = np.random.default_rng()
+
+    # For h (10,), pick 4 random indices
+    indices_h = rng.choice(10, size=5, replace=False).tolist()
+
+    # Run the gradient check for this k
+    check_backward_softmax(indices_h)
+    
+test_backward_softmax_random_indices()
+\end{python}
+
+The backward pass computes the gradient of the Loss with respect to logits:
+\[
+\frac{\partial \ell}{\partial h^{(\ell)}_k}
+= \hat p_k - \mathbf{1}\{k=y\}.
+\]
+
+The above formulation was derived in Part (e). \\
+
+\textbf{Numerical gradient approximation.} \\
+To check correctness, I approximate the derivative of $\ell$ with respect to each logit $h^{(\ell)}_i$ by finite differences:
+\[
+\frac{\partial \ell}{\partial h^{(\ell)}_i}
+\approx \frac{\ell(h^{(\ell)}+\epsilon e_i) - \ell(h^{(\ell)}-\epsilon e_i)}{2\epsilon},
+\]
+where $e_i$ is a perturbation vector with $1$ at coordinate $i$ and $0$ elsewhere.  
+In the code, $\epsilon$ is sampled as a small Gaussian perturbation with variance $10^{-8}$.
+
+\textbf{Verification procedure.}
+The function \verb|check_backward_softmax| executes the following steps:
+\begin{enumerate}
+  \item Initialize a \verb|softmax_cross_entropy_t| layer.
+  \item Sample random logits $h^{(\ell)} \in \mathbb{R}^{1 \times 10}$ and a random label $y$.
+  \item Run the forward pass: \verb|layer.forward(hl, y)|.
+  \item Compute the backward pass: \verb|dhl = layer.backward()|, which gives the analytical gradient $\nabla_{h^{(\ell)}} \ell$.
+  \item For randomly chosen input indices $i$, perturb $h^{(\ell)}$ with $\pm \epsilon e_i$ and recompute the loss using \verb|softmax_cross_entropy_utility|.  
+  Compute the finite-difference derivative and compare it to \verb|dhl[0,i]| with \verb|np.testing.assert_allclose|  
+\end{enumerate}
+
+\paragraph{Randomized testing.}
+The function \verb|test_backward_softmax_random_indices|:
+\begin{itemize}
+  \item Randomly selects 5 input indices from the 10-dimensional logit vector.
+  \item Calls \verb|check_backward_softmax| to perform gradient checking at those indices.
+\end{itemize}
+
+\item[(g), (h)]  I have put the necessary deliverables for part (g) and (h) together since the code is interweaved. Attached below is the code for parts (g) and (h)
+\begin{python}
+## part (g) and (h)
+### Initialize all Layers
+l1, l2, l3, l4 = embedding_t(), linear_t(), relu_t(), softmax_cross_entropy_t()
+net = [l1, l2, l3, l4]
+print("Part g: Print shapes of X_train, y_train, X_val, and y_val again")
+print(f"X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}, X_val shape -> {X_val.shape}, y_val shape: {y_val.shape}")
+
+# X: Full set of samples
+# y: Full set of labels
+# B: Batch Size
+def validate(l1_w, l1_b, l2_w, l2_b, X, y, B):
+    # 1. iterate over mini-batches from the dataset (X, y)
+    loss, tot_error = 0, 0
+    for i in range(0, X.shape[0], B):
+        X_batch, y_batch = X[i: i + B], y[i: i + B]
+
+        # Compute forward pass
+        h1 = embedding_utility(X_batch, l1_w, l1_b)
+        h2 = h1 @ l2_w.T + l2_b
+        h3 = np.maximum(0, h2)
+        batch_loss, batch_error = softmax_cross_entropy_utility(h3, y_batch)
+
+        # Accumulate
+        loss += batch_loss * B
+        tot_error += batch_error * B
+    
+    avg_loss = loss / X.shape[0]
+    avg_error = tot_error/ X.shape[0]
+    return avg_loss, avg_error
+
+
+# Train for at least 1000 iterations
+B = 32
+lr = 0.1
+training_losses = []
+training_errors = []
+validation_losses = []
+validation_errors = []
+epochs = 10000
+for t in range(epochs):
+    # 1. sample a mini-batch of size = 32
+    # each image in the mini-batch is chosen uniformly randomly from the
+    # training dataset
+    indices = np.random.choice(X_train.shape[0], size=B, replace=False)
+    X_train_batch = X_train[indices]
+    y_train_batch = y_train[indices]
+
+    # 2. zero gradient buffer
+    for l in net:
+        l.zero_grad()
+
+    # 3. Forward Pass
+    h1 = l1.forward(X_train_batch)
+    h2 = l2.forward(h1)
+    h3 = l3.forward(h2)
+    ell, error = l4.forward(h3, y_train_batch)
+
+    # 4. Backward Pass
+    dh3 = l4.backward()
+    dh2 = l3.backward(dh3)
+    dh1 = l2.backward(dh2)
+    dx = l1.backward(dh1)
+
+    # 5. Gather Backprop gradients
+    dw1, db1 = l1.dw, l1.db
+    dw2, db2 = l2.dw, l2.db
+    
+    # Store training loss/error every 10 weight updates
+    if (t + 1) % 10 == 0:
+        training_loss, training_error = validate(l1.w, l1.b, l2.w, l2.b, X_train, y_train, B)
+        print(f"Epoch: {t + 1}, Training Loss: {training_loss}, Training Error: {training_error}")
+        training_losses.append(training_loss)
+        training_errors.append(training_error)
+    
+    # 6. Store validation loss/error every 1000 weight updates
+    if (t + 1) % 100 == 0:
+        validation_loss, validation_error = validate(l1.w, l1.b, l2.w, l2.b, X_val, y_val, B)
+        print(f"Epoch: {t + 1}, Validation Loss: {validation_loss}, Validation Error: {validation_error}")
+        validation_losses.append(validation_loss)
+        validation_errors.append(validation_error)
+
+    # 7. one step of SGD
+    l1.w = l1.w - lr*dw1
+    l1.b = l1.b - lr*db1
+    l2.w = l2.w - lr*dw2
+    l2.b = l2.b - lr*db2
+
+# Store plot of training loss
+plt.figure(figsize=(8, 5))
+plt.plot(training_losses, label='Training Loss[Ravi]')
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+plt.title('Training Loss vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('training_loss_plot_ravi.png', dpi=300)
+
+# Store plot of training error
+plt.figure(figsize=(8, 5))
+plt.plot(training_errors, label='Training Error[Ravi]')
+plt.xlabel('Iteration')
+plt.ylabel('Error')
+plt.title('Training Error vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('training_error_plot_ravi.png', dpi=300)
+
+# Store plot of validation loss
+plt.figure(figsize=(8, 5))
+plt.plot(validation_losses, label='Validation Loss[Ravi]')
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+plt.title('Validation Loss vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('validation_loss_plot_ravi.png', dpi=300)
+
+# Store plot of validation error
+plt.figure(figsize=(8, 5))
+plt.plot(validation_errors, label='Validation Error[Ravi]')
+plt.xlabel('Iteration')
+plt.ylabel('Error')
+plt.title('Validation Error vs Iteration')
+plt.legend()
+plt.grid(True)
+plt.savefig('validation_error_plot_ravi.png', dpi=300)
+
+# Store Final Metrics
+import pandas as pd
+final_metrics = {
+    "Training Error": [training_errors[-1]],
+    "Training Loss": [training_losses[-1]],
+    "Validation Error": [validation_errors[-1]],
+    "Validation Loss": [validation_losses[-1]]
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(final_metrics)
+
+# Save to CSV
+df.to_csv("final_metrics_ravi.csv", index=False)
+\end{python}
+
+Now, I am going to put the plots of training loss, training error, validation loss, and validation error
 
 
 \end{enumerate}
