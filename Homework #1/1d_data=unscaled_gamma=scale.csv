@@ -1,0 +1,2 @@
+Training Accuracy,Training Error,Validation Accuracy,Validation Error,Support Vector Ratio,Test Accuracy,Test Error,X.var()
+0.98125,0.01875,0.96,0.04,0.380375,0.9577857142857142,0.04221428571428571,5157.632694040334

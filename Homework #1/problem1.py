@@ -48,47 +48,139 @@ x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_st
 
 ## Part (d)
 from sklearn import svm
-classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = 'scale')
+from sklearn.metrics import accuracy_score, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 
-### Fit to training data
-classifier.fit(x_train, y_train)
+### Define helper function to fit classifier and get necessary metrics
+def fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma = 'scale'):
+    classifier = svm.SVC(C = 1.0, kernel = 'rbf', gamma = gamma)
 
-### Predict labels of training data using trained classifier
-y_train_pred = classifier.predict(x_train)
+    ### Fit to training data
+    classifier.fit(x_train, y_train)
 
-### Predict labels of validation data using trained classifier
-y_val_pred = classifier.predict(x_val)
+    ### Predict labels of training data using trained classifier
+    y_train_pred = classifier.predict(x_train)
 
-### Run the classifier on x_test,y_test
-y_test_pred = classifier.predict(x_test)
+    ### Predict labels of validation data using trained classifier
+    y_val_pred = classifier.predict(x_val)
 
-### Training Error
-from sklearn.metrics import accuracy_score
-training_accuracy_score = accuracy_score(y_train, y_train_pred)
-train_error = np.mean(y_train_pred != y_train)
-print("Training Accuracy: ", training_accuracy_score, " Training Error: ", train_error)
+    ### Run the classifier on x_test,y_test
+    y_test_pred = classifier.predict(x_test)
 
-### Validation Error
-validation_accuracy_score = accuracy_score(y_val, y_val_pred)
-val_error = np.mean(y_val_pred != y_val)
-print("Validation Accuracy: ", validation_accuracy_score, " Validation Error: ", val_error)
+    ### Training Error
+    training_accuracy_score = accuracy_score(y_train, y_train_pred)
+    train_error = np.mean(y_train_pred != y_train)
 
-### Compute ratio of the number of support samples to the total number of training samples for classifier
-num_support_vectors = len(classifier.support_)
-total_training_samples = x_train.shape[0]
-support_vector_ratio = num_support_vectors / total_training_samples
-print("Support Vector Ratio: ", support_vector_ratio)
+    ### Validation Error
+    validation_accuracy_score = accuracy_score(y_val, y_val_pred)
+    val_error = np.mean(y_val_pred != y_val)
 
-### Report the classification error for Test Data
-test_accuracy_score = accuracy_score(y_test, y_test_pred)
-test_error = np.mean(y_test_pred != y_test)
-print("Test Accuracy: ", test_accuracy_score, " Test Error: ", test_error)
+    ### Compute ratio of the number of support samples to the total number of training samples for classifier
+    num_support_vectors = len(classifier.support_)
+    total_training_samples = x_train.shape[0]
+    support_vector_ratio = num_support_vectors / total_training_samples
 
-### Report the 10-class confusion matrix on the test data
-from sklearn.metrics import confusion_matrix
-conf_matrix = confusion_matrix(y_test, y_test_pred)
-print("Confusion Matrix:\n", conf_matrix)
+    ### Report the classification error for Test Data
+    test_accuracy_score = accuracy_score(y_test, y_test_pred)
+    test_error = np.mean(y_test_pred != y_test)
 
+    ### Report the 10-class confusion matrix on the test data
+    conf_matrix = confusion_matrix(y_test, y_test_pred, labels = classifier.classes_)
+
+    metrics = {
+        "Training Accuracy": training_accuracy_score,
+        "Training Error": train_error,
+        "Validation Accuracy": validation_accuracy_score,
+        "Validation Error": val_error,
+        "Support Vector Ratio": support_vector_ratio,
+        "Test Accuracy": test_accuracy_score,
+        "Test Error": test_error,
+        "X.var()": x_train.var()
+    }
+
+    return metrics, conf_matrix, y_train_pred, y_val_pred, y_test_pred, classifier
+
+### Generate "unscaled" data by multiplying train, test, and val by 255.0
+x_train_unscaled, x_val_unscaled, x_test_unscaled = x_train * 255.0, x_val * 255.0, x_test * 255.0
+
+### Call Function on unscaled data with gamma = 'auto'
+data_unscaled_gamma_auto_metrics, conf_matrix, _, _, _, classifier = fit_and_evaluate_svm(x_train_unscaled, y_train, x_val_unscaled, y_val, x_test_unscaled, y_test, gamma = 'auto')
+
+#### Save Metrics
+import pandas as pd
+pd.DataFrame([data_unscaled_gamma_auto_metrics]).to_csv("1d_data=unscaled_gamma=auto.csv", index=False)
+
+#### Save Confusion Matrix Plot
+disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels = classifier.classes_)
+disp.plot(cmap="Blues", values_format="d")
+plt.title("Confusion Matrix: data = unscaled and gamma = auto")
+plt.savefig("1d_confusion_matrix_data=unscaled_gamma=auto.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+### Call Function on unscaled data with gamma = 'scale'
+data_unscaled_gamma_scale_metrics, conf_matrix, _, _, _, classifier = fit_and_evaluate_svm(x_train_unscaled, y_train, x_val_unscaled, y_val, x_test_unscaled, y_test, gamma = 'scale')
+
+#### Save Metrics
+pd.DataFrame([data_unscaled_gamma_scale_metrics]).to_csv("1d_data=unscaled_gamma=scale.csv", index=False)
+
+#### Save Confusion Matrix Plot
+disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels = classifier.classes_)
+disp.plot(cmap="Blues", values_format="d")
+plt.title("Confusion Matrix: data = unscaled and gamma = scale")
+plt.savefig("1d_confusion_matrix_data=unscaled_gamma=scale.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+### Call Function on scaled data with gamma = 'auto'
+data_scaled_gamma_auto_metrics, conf_matrix, _, _, _, classifier = fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma = 'auto')
+
+#### Save Metrics
+import pandas as pd
+pd.DataFrame([data_scaled_gamma_auto_metrics]).to_csv("1d_data=scaled_gamma=auto.csv", index=False)
+
+#### Save Confusion Matrix Plot
+disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels = classifier.classes_)
+disp.plot(cmap="Blues", values_format="d")
+plt.title("Confusion Matrix: data = scaled and gamma = auto")
+plt.savefig("1d_confusion_matrix_data=scaled_gamma=auto.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+### Call Function on scaled data with gamma = 'scale'
+data_scaled_gamma_scale_metrics, conf_matrix, _, _, y_test_pred, classifier = fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma = 'scale')
+
+#### Save Metrics
+pd.DataFrame([data_scaled_gamma_scale_metrics]).to_csv("1d_data=scaled_gamma=scale.csv", index=False)
+
+#### Save Confusion Matrix Plot
+disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels = classifier.classes_)
+disp.plot(cmap="Blues", values_format="d")
+plt.title("Confusion Matrix: data = scaled and gamma = scale")
+plt.savefig("1d_confusion_matrix_data=scaled_gamma=scale.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+#### Error Analysis on Confusion Matrix
+def plot_misclassified_sample(true_label, pred_label):
+    mask = (y_test == true_label) & (y_test_pred == pred_label)
+    indices = np.where(mask)[0]
+
+    ##### Save test image plot
+    random_index = indices[-1]
+    sample_misclassified_test_image = x_test[random_index].reshape(14, 14)
+    plt.imshow(sample_misclassified_test_image, cmap = "gray")
+    plt.title(f"True Label = {true_label}, Predicted Label = {pred_label}")
+    plt.savefig(f"1d_misclassified_test_image_true={true_label}_pred={pred_label}.png", dpi = 300, bbox_inches = "tight")
+    plt.close()
+
+#### Part 1: find all samples where true = 4, predicted = 9 and plot one of them for visual inspection
+true_label = '4'
+pred_label = '9'
+plot_misclassified_sample(true_label, pred_label)
+
+#### Part 2: find all samples where true = 3, predicted = 5 and plot one of them for visual inspection
+true_label = '3'
+pred_label = '5'
+plot_misclassified_sample(true_label, pred_label)
+
+exit()
 ## Part (g)
 ### Applying GridSearchCV on SVC 
 from sklearn.model_selection import GridSearchCV
