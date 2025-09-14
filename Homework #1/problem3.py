@@ -5,7 +5,7 @@ random_state = 42
 
 ## Part (a)
 
-### Load Data from torchvision using the Code provided by the assignment. Added transforms to Normalize Data
+### Load Data from torchvision using the Code provided by the assignment.
 import torchvision as thv
 train = thv.datasets.MNIST("./", download=True, train=True)
 val = thv.datasets.MNIST("./", download=True, train=False)
