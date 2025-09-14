@@ -5,7 +5,7 @@ random_state = 42
 
 ## Part (a)
 
-### Load Data from torchvision using the Code provided by the assignment
+### Load Data from torchvision using the Code provided by the assignment. Added transforms to Normalize Data
 import torchvision as thv
 train = thv.datasets.MNIST("./", download=True, train=True)
 val = thv.datasets.MNIST("./", download=True, train=False)
@@ -23,9 +23,9 @@ y_val = val.targets.numpy()
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after converting to numpy")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
-### Normalize Data
-X_train = X_train.astype(np.float64) / 255.0
-X_val = X_val.astype(np.float64) / 255.0
+### Convert X_train and X_val to np.float64
+X_train = X_train.astype(np.float64)
+X_val = X_val.astype(np.float64)
 
 ### Given X and y, where X contains training samples and y contains labels, keep only 50% of each class! 
 def downsample(X, y):
@@ -47,6 +47,10 @@ X_train, y_train = downsample(X_train, y_train)
 X_val, y_val = downsample(X_val, y_val)
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after downsampling")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
+
+### Pre-processing: Step 1: Divide all pixels by 255 to get images in [0, 1].
+X_train = X_train / 255.0
+X_val = X_val / 255.0
 
 ## Plot the images of a few images in the dataset just to see if label is right
 # Function to plot a grid of images with labels
