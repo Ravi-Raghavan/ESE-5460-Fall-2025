@@ -12,9 +12,15 @@ from sklearn.model_selection import train_test_split
 ds = fetch_openml("mnist_784", as_frame=False)
 x, x_test, y, y_test = train_test_split(ds.data, ds.target, test_size=0.2, random_state=random_state)
 
-### Convert x and x_test to np.float64 arrays
-x = x.astype(np.float64)
-x_test = x_test.astype(np.float64)
+### Sanity checks: ensure MNIST images have expected scale of [0, 255], denoting the grayscale spectrum
+assert x.max() <= 255
+assert x.min() >= 0
+assert x_test.max() <= 255
+assert x_test.min() >= 0
+
+### Data Pre-Processing: Convert x and x_test to np.float64 arrays and normalize to make pixel values in range [0, 1]
+x = x.astype(np.float64) / 255.0
+x_test = x_test.astype(np.float64) / 255.0
 
 ### Plot Sample Image
 import matplotlib.pyplot as plt
@@ -23,7 +29,7 @@ plt.imshow(a)
 plt.savefig("1c_sample_image.png", dpi=300, bbox_inches="tight")
 plt.close()
 
-### Downsample x and x_test from 28 x 28 to 14 x 14
+### Downsampling: Downsample x and x_test from 28 x 28 to 14 x 14
 import cv2
 def downsample_images(images):
     downsampled_images = []
@@ -36,7 +42,7 @@ def downsample_images(images):
 x = downsample_images(x)
 x_test = downsample_images(x_test)
 
-### Randomly subsample x to create dataset of size 10000 with 1000 samples per label (subsample y accordingly)
+### Dataset Creation: Randomly subsample x to create dataset of size 10000 with 1000 samples per label (subsample y accordingly)
 chosen_indices = []
 for label in np.unique(y):
     indices = np.where(y == label)[0]
@@ -47,18 +53,8 @@ chosen_indices = np.array(chosen_indices)
 x = x[chosen_indices]
 y = y[chosen_indices]
 
-### Use train_test_split to split x and y into train and validation sets (80% train, 20% validation)
+### Dataset Split: Use train_test_split to split x and y into train and validation sets (80% train, 20% validation)
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=random_state)
-
-### Divide all pixel values by 255.0 to get values between 0 and 1
-x_train, x_val, x_test = x_train / 255.0, x_val / 255.0, x_test / 255.0
-
-### Standardize Features across training set and use those same mean/std for validation and test set
-# from sklearn.preprocessing import StandardScaler
-# scaler = StandardScaler()
-# x_train = scaler.fit_transform(x_train)
-# x_val = scaler.transform(x_val)
-# x_test = scaler.transform(x_test)
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -103,6 +99,7 @@ def fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma =
     ### Report the 10-class confusion matrix on the test data
     conf_matrix = confusion_matrix(y_test, y_test_pred, labels = classifier.classes_)
 
+    # Record Metrics
     metrics = {
         "Training Accuracy": training_accuracy_score,
         "Training Error": train_error,
@@ -111,12 +108,12 @@ def fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma =
         "Support Vector Ratio": support_vector_ratio,
         "Test Accuracy": test_accuracy_score,
         "Test Error": test_error,
-        "X.var()": x_train.var()
+        "X_train.var()": x_train.var()
     }
 
     return metrics, conf_matrix, y_train_pred, y_val_pred, y_test_pred, classifier
 
-### Call Function on scaled data with gamma = 'auto'
+### Call Function with gamma = 'auto'
 gamma_auto_metrics, conf_matrix, _, _, _, classifier = fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma = 'auto')
 
 #### Save Metrics
@@ -129,7 +126,7 @@ plt.title("Confusion Matrix: gamma = auto")
 plt.savefig("1d_confusion_matrix_gamma=auto.png", dpi=300, bbox_inches="tight")
 plt.close()
 
-### Call Function on scaled data with gamma = 'scale'
+### Call Function with gamma = 'scale'
 gamma_scale_metrics, conf_matrix, _, _, y_test_pred, classifier = fit_and_evaluate_svm(x_train, y_train, x_val, y_val, x_test, y_test, gamma = 'scale')
 
 #### Save Metrics
@@ -142,28 +139,31 @@ plt.title("Confusion Matrix: gamma = scale")
 plt.savefig("1d_confusion_matrix_gamma=scale.png", dpi=300, bbox_inches="tight")
 plt.close()
 
-#### Error Analysis on Confusion Matrix
-def plot_misclassified_sample(true_label, pred_label):
+#### Plot Misclassified Sample where true_label denotes the true label and pred_label denotes the predicted label
+def plot_misclassified_sample(true_label, pred_label, x_test, y_test, y_test_pred):
     mask = (y_test == true_label) & (y_test_pred == pred_label)
     indices = np.where(mask)[0]
 
-    ##### Save test image plot
-    random_index = indices[-1]
-    sample_misclassified_test_image = x_test[random_index].reshape(14, 14)
+    # Handle case where no misclassified samples are found
+    if (len(indices) == 0):
+        print(f"No misclassified samples found for True Label = {true_label}, Predicted Label = {pred_label}")
+        return
+
+    ##### Save test image plot and use the first index as convenience
+    first_index = indices[0]
+    sample_misclassified_test_image = x_test[first_index].reshape(14, 14)
     plt.imshow(sample_misclassified_test_image, cmap = "gray")
     plt.title(f"True Label = {true_label}, Predicted Label = {pred_label}")
     plt.savefig(f"1d_misclassified_test_image_true={true_label}_pred={pred_label}.png", dpi = 300, bbox_inches = "tight")
     plt.close()
 
 #### Part 1: find all samples where true = 4, predicted = 9 and plot one of them for visual inspection
-true_label = '4'
-pred_label = '9'
-plot_misclassified_sample(true_label, pred_label)
+true_label, pred_label = '4', '9'
+plot_misclassified_sample(true_label, pred_label, x_test, y_test, y_test_pred)
 
 #### Part 2: find all samples where true = 3, predicted = 5 and plot one of them for visual inspection
-true_label = '3'
-pred_label = '5'
-plot_misclassified_sample(true_label, pred_label)
+true_label, pred_label = '3', '5'
+plot_misclassified_sample(true_label, pred_label, x_test, y_test, y_test_pred)
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -194,7 +194,7 @@ results = []
 for mean, params in zip(grid_search.cv_results_["mean_test_score"], grid_search.cv_results_["params"]):
     results.append({
         "C": params["C"],
-        "CV_Accuracy": mean
+        "Cross Validation Accuracy": mean
     })
 
 df = pd.DataFrame(results)
@@ -203,7 +203,7 @@ df.to_csv("1g_cv_results.csv", index=False)
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## Part (h)
-### Randomly subsample x to create dataset of size 2000 with 200 samples per label [100 for train + 100 for validation]
+### Dataset Creation: Randomly subsample x to create dataset of size 2000 with 200 samples per label [100 for train + 100 for validation]
 chosen_indices_training = []
 chosen_indices_validation = []
 for label in np.unique(y):
@@ -216,25 +216,43 @@ for label in np.unique(y):
 chosen_indices_training = np.array(chosen_indices_training)
 chosen_indices_validation = np.array(chosen_indices_validation)
 
-x_train, y_train, x_validation, y_validation = x[chosen_indices_training], y[chosen_indices_training], \
-x[chosen_indices_validation], y[chosen_indices_validation]
+x_train, y_train, x_val, y_val = x[chosen_indices_training], y[chosen_indices_training], x[chosen_indices_validation], y[chosen_indices_validation]
 
 #### Plot Gabor Coefficients[Real + Imaginary]
 from skimage.filters import gabor_kernel , gabor
+
+# freq, theta, and bandwidth are parameters of the Gabor Kernel
+# problem_part is either 'h' or 'j' depending on which part of the problem we are solving. This is relevant as we save the plots with different names
+def plot_gabor_kernel_and_convolution(freq, theta, bandwidth, problem_part):
+    gk = gabor_kernel(frequency=freq, theta=theta, bandwidth=bandwidth)
+    plt.figure(1); plt.clf(); plt.imshow(gk.real); plt.title("Real Gabor Coefficients"); plt.savefig(f"1{problem_part}_real_coeff_gabor_freq={freq}, theta={theta}, bandwidth={bandwidth}.png")
+    plt.figure(2); plt.clf(); plt.imshow(gk.imag); plt.title("Imaginary Gabor Coefficients"); plt.savefig(f"1{problem_part}_img_coeff_gabor_freq={freq}, theta={theta}, bandwidth={bandwidth}.png")
+
+    # Convolve the input image with the kernel and get co-efficients. Only use the real part
+    image = x[0].reshape((14,14))
+    plt.figure(3); plt.clf(); plt.title("Sample Image"); plt.imshow(image); plt.savefig(f"1{problem_part}_img_0_freq={freq}, theta={theta}, bandwidth={bandwidth}.png")
+    coeff_real, _ = gabor(image, frequency=freq, theta=theta, bandwidth=bandwidth)
+    plt.figure(4); plt.clf(); plt.title("Real Coefficients after Gabor Convolution"); plt.imshow(coeff_real); plt.savefig(f"1{problem_part}_real_coeff_img_0_freq={freq}, theta={theta}, bandwidth={bandwidth}.png")
+
 freq, theta, bandwidth = 0.1, np.pi/4, 1
-gk = gabor_kernel(frequency=freq, theta=theta, bandwidth=bandwidth)
-plt.figure(1); plt.clf(); plt.imshow(gk.real); plt.title("Real Gabor Coefficients"); plt.savefig("1h_real_coeff_gabor.png")
-plt.figure(2); plt.clf(); plt.imshow(gk.imag); plt.title("Imaginary Gabor Coefficients"); plt.savefig("1h_img_coeff_gabor.png")
-
-# Convolve the input image with the kernel and get co-efficients. Only use the real part
-image = x[0].reshape((14,14))
-plt.figure(3); plt.clf(); plt.title("Sample Image"); plt.imshow(image); plt.savefig("1h_img_0.png")
-coeff_real, _ = gabor(image, frequency=freq, theta=theta, bandwidth=bandwidth)
-plt.figure(4); plt.clf(); plt.title("Real Coefficients after Gabor Convolution"); plt.imshow(coeff_real); plt.savefig("1h_real_coeff_img_0.png")
-
+plot_gabor_kernel_and_convolution(freq, theta, bandwidth, problem_part='h')
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## Part (j)
+### Experiment with freq, theta, and bandwidth to see how the filter changes in shape and size and the corresponding output after convolution
+
+#### Experiment #1: Change thetaL the rotation angle of the Gaussian
+freq, theta, bandwidth = 0.1, np.pi/2, 1
+plot_gabor_kernel_and_convolution(freq, theta, bandwidth, problem_part='j')
+
+#### Experiment #2: Change frequency, the spatial frequency of the filter
+freq, theta, bandwidth = 1, np.pi/4, 1
+plot_gabor_kernel_and_convolution(freq, theta, bandwidth, problem_part='j')
+
+#### Experiment #3: Change bandwidth
+freq, theta, bandwidth = 0.1, np.pi/4, 10
+plot_gabor_kernel_and_convolution(freq, theta, bandwidth, problem_part='j')
+
 # Define thetas, frequencies, and bandwidths: Parameters of the Gabor Filters
 thetas = np.arange(0,np.pi,np.pi/4)
 frequencies = np.arange(0.05,0.5,0.15)
@@ -269,7 +287,8 @@ def extract_gabor_features(images, filters, img_shape=(14, 14)):
     feats = np.empty((n_imgs, n_filters * n_feats_per_filter), dtype=np.float64)
 
     for i, img in enumerate(images):
-        print(f"Index: {i}")
+        if (i + 1) % 100 == 0:
+            print(f"Checkpoint: {i + 1}")
         img_reshaped = img.reshape(img_shape)
 
         # Collect features for all filters
@@ -284,52 +303,79 @@ def extract_gabor_features(images, filters, img_shape=(14, 14)):
 
 ## Check if gabor features are saved, if not re-create them and save them
 import os
-if os.path.exists("x_train_gabor_feats_36.npy") and os.path.exists("x_validation_gabor_feats_36.npy"):
+if os.path.exists("x_train_gabor_feats_36.npy") and os.path.exists("x_val_gabor_feats_36.npy"):
     x_train_gabor_feats = np.load("x_train_gabor_feats_36.npy")
-    x_validation_gabor_feats = np.load("x_validation_gabor_feats_36.npy")
+    x_val_gabor_feats = np.load("x_val_gabor_feats_36.npy")
 else:
-    # Extract gabor features for train + test
+    ## Extract gabor features for train + validation
     x_train_gabor_feats = extract_gabor_features(x_train, filters)
-    x_validation_gabor_feats  = extract_gabor_features(x_validation, filters)
+    x_val_gabor_feats  = extract_gabor_features(x_val, filters)
+    np.save("x_train_gabor_feats_36_raw.npy", x_train_gabor_feats)
+    np.save("x_val_gabor_feats_36_raw.npy", x_val_gabor_feats)
 
-    ## Standardize Features across training set and use those same mean/std for validation set
+    ## Standardize Features by fitting Standard Scalar to Training and use those same mean/std for validation
     from sklearn.preprocessing import StandardScaler
     scaler = StandardScaler()
-    x_train_gabor_feats = scaler.fit_transform(x_train_gabor_feats)
-    x_validation_gabor_feats = scaler.transform(x_validation_gabor_feats)
+
+    ## Fit Standard Scalar on Train
+    scaler.fit(x_train_gabor_feats)
+
+    ## Transform Train and Validation
+    x_train_gabor_feats = scaler.transform(x_train_gabor_feats)
+    x_val_gabor_feats = scaler.transform(x_val_gabor_feats)
     np.save("x_train_gabor_feats_36.npy", x_train_gabor_feats)
-    np.save("x_validation_gabor_feats_36.npy", x_validation_gabor_feats)
+    np.save("x_val_gabor_feats_36.npy", x_val_gabor_feats)
 
 print("Finished extracting Gabor Features from Train + Validation")
 
-# Train SVC on Gabor Features
-classifier = svm.SVC(kernel = 'rbf', C = 1.0, gamma = 'scale')
-classifier.fit(x_train_gabor_feats, y_train)
-y_train_pred = classifier.predict(x_train_gabor_feats)
-y_val_pred = classifier.predict(x_validation_gabor_feats)
+# Train SVC on Gabor Features via GridSearchCV
+## Define parameter search space
+param_grid = {
+    'C': [0.5, 1, 1.5, 2],
+    'gamma': ['auto', 'scale'],
+    'kernel': ['linear', 'rbf']
+}
+
+## Define Grid Search CV object
+grid_search = GridSearchCV(
+    estimator = svm.SVC(),
+    param_grid = param_grid,
+    cv = 5,
+    n_jobs = -1,
+    verbose = 3
+)
+
+## Generate combined gabor features + labels [Train + Validation]
+x_gabor_feats_combined = np.vstack((x_train_gabor_feats, x_val_gabor_feats))
+y_combined = np.concatenate((y_train, y_val))
+
+## Fit on x_gabor_feats_combined [Train + Validation]
+grid_search.fit(x_gabor_feats_combined, y_combined)
+
+## Retrieve best predictor and fit on training
+best_classifier = grid_search.best_estimator_
+best_classifier.fit(x_train_gabor_feats, y_train)
+
+## Print Best Hyperparameters
+print(f"Best Hyperparameters for 36 Gabor Filter Bank: {grid_search.best_params_}")
+
+## Get Metrics on Training + Validation
+y_train_pred = best_classifier.predict(x_train_gabor_feats)
+y_val_pred = best_classifier.predict(x_val_gabor_feats)
 train_accuracy = accuracy_score(y_train, y_train_pred)
 train_error = np.mean(y_train_pred != y_train)
-val_accuracy = accuracy_score(y_validation, y_val_pred)
-val_error = np.mean(y_val_pred != y_validation)
-conf_matrix = confusion_matrix(y_validation, y_val_pred, labels = classifier.classes_)
-
-# Save Confusion Matrix
-disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels = classifier.classes_)
-disp.plot(cmap="Blues", values_format="d")
-plt.title("Confusion Matrix: Gabor Features with 36 filters")
-plt.savefig("1j_confusion_matrix_gabor_features_filters=36.png", dpi=300, bbox_inches="tight")
-plt.close()
+val_accuracy = accuracy_score(y_val, y_val_pred)
+val_error = np.mean(y_val_pred != y_val)
 
 ## Store Results in CSV
 results = {
     "Training Accuracy": train_accuracy,
     "Training Error": train_error,
     "Validation Accuracy": val_accuracy,
-    "Validation Error": val_error,
-    "X.var()": x_train_gabor_feats.var()
+    "Validation Error": val_error
 }
 
-pd.DataFrame([results]).to_csv("1j_gabor_validation_results_filters=36.csv", index=False)
+pd.DataFrame([results]).to_csv("1j_gabor_results_filters=36.csv", index=False)
 
 # Increase number of filters to 75 by adding more theta, frequency, and bandwidth values
 thetas = np.arange(0, np.pi, np.pi / 5)  # 5 values
@@ -355,49 +401,94 @@ fig.suptitle("Gabor Filter Bank: Filters = 75")
 plt.tight_layout()
 plt.savefig("1j_gabor_filter_bank_filters=75.png")
 
-# Extract gabor features for train + test
-if os.path.exists("x_train_gabor_feats_75.npy") and os.path.exists("x_validation_gabor_feats_75.npy"):
+# Extract gabor features for train + validation
+if os.path.exists("x_train_gabor_feats_75.npy") and os.path.exists("x_val_gabor_feats_75.npy"):
     x_train_gabor_feats = np.load("x_train_gabor_feats_75.npy")
-    x_validation_gabor_feats = np.load("x_validation_gabor_feats_75.npy")
+    x_val_gabor_feats = np.load("x_val_gabor_feats_75.npy")
 else:
-    # Extract gabor features for train + test
+    # Extract gabor features for train + validation
     x_train_gabor_feats = extract_gabor_features(x_train, filters)
-    x_validation_gabor_feats  = extract_gabor_features(x_validation, filters)
+    x_val_gabor_feats  = extract_gabor_features(x_val, filters)
+    np.save("x_train_gabor_feats_75_raw.npy", x_train_gabor_feats)
+    np.save("x_val_gabor_feats_75_raw.npy", x_val_gabor_feats)
 
     ## Standardize Features across training set and use those same mean/std for validation set
     from sklearn.preprocessing import StandardScaler
     scaler = StandardScaler()
-    x_train_gabor_feats = scaler.fit_transform(x_train_gabor_feats)
-    x_validation_gabor_feats = scaler.transform(x_validation_gabor_feats)
+
+    ## Fit Standard Scalar on Train
+    scaler.fit(x_train_gabor_feats)
+
+    ## Transform Train, Validation, and Test
+    x_train_gabor_feats = scaler.transform(x_train_gabor_feats)
+    x_val_gabor_feats = scaler.transform(x_val_gabor_feats)
+    np.save("x_train_gabor_feats_75_ss.npy", x_train_gabor_feats)
+    np.save("x_val_gabor_feats_75_ss.npy", x_val_gabor_feats)
+
+    ## Run PCA to preserve 95% of the variance in the dataset
+    # Fit PCA on (Train) and Transform Train and Validation
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=0.95, random_state=random_state)
+
+    ## Fit PCA on Train
+    pca.fit(x_train_gabor_feats)
+
+    ## Transform Datasets
+    x_train_gabor_feats = pca.transform(x_train_gabor_feats)
+    x_val_gabor_feats = pca.transform(x_val_gabor_feats)
     np.save("x_train_gabor_feats_75.npy", x_train_gabor_feats)
-    np.save("x_validation_gabor_feats_75.npy", x_validation_gabor_feats)
+    np.save("x_val_gabor_feats_75.npy", x_val_gabor_feats)
+
 
 print("Finished extracting Gabor Features from Train + Validation")
 
-# Run PCA on Training + Test Gabor Features
-from sklearn.decomposition import PCA
-pca = PCA(n_components=0.95, random_state=random_state)
-x_train_gabor_feats_pca = pca.fit_transform(x_train_gabor_feats)
-x_validation_gabor_feats_pca = pca.transform(x_validation_gabor_feats)
+# Train SVC on PCA transformed Gabor Features via GridSearchCV
+## Define parameter search space
+param_grid = {
+    'C': [0.5, 1, 1.5, 2],
+    'gamma': ['auto', 'scale'],
+    'kernel': ['linear', 'rbf']
+}
 
-# Train SVC on PCA transformed features
-classifier = svm.SVC(kernel = 'rbf', C = 1.0, gamma = 'scale')
-classifier.fit(x_train_gabor_feats_pca, y_train)
-y_train_pred = classifier.predict(x_train_gabor_feats_pca)
-y_val_pred = classifier.predict(x_validation_gabor_feats_pca)
+## Define Grid Search CV object
+grid_search = GridSearchCV(
+    estimator = svm.SVC(),
+    param_grid = param_grid,
+    cv = 5,
+    n_jobs = -1,
+    verbose = 3
+)
+
+## Generate combined gabor features + labels [Train + Validation]
+x_gabor_feats_combined = np.vstack((x_train_gabor_feats, x_val_gabor_feats))
+y_combined = np.concatenate((y_train, y_val))
+
+## Fit on x_gabor_feats_combined [Train + Validation]
+grid_search.fit(x_gabor_feats_combined, y_combined)
+
+## Retrieve best predictor and fit on training
+best_classifier = grid_search.best_estimator_
+best_classifier.fit(x_train_gabor_feats, y_train)
+
+## Print Best Hyperparameters
+print(f"Best Hyperparameters for 75 Gabor Filter Bank: {grid_search.best_params_}")
+
+## Report Metrics on Train + Validation
+y_train_pred = best_classifier.predict(x_train_gabor_feats)
+y_val_pred = best_classifier.predict(x_val_gabor_feats)
 train_accuracy = accuracy_score(y_train, y_train_pred)
 train_error = np.mean(y_train_pred != y_train)
-val_accuracy = accuracy_score(y_validation, y_val_pred)
-val_error = np.mean(y_val_pred != y_validation)
-conf_matrix = confusion_matrix(y_validation, y_val_pred, labels = classifier.classes_)
+val_accuracy = accuracy_score(y_val, y_val_pred)
+val_error = np.mean(y_val_pred != y_val)
 
-## Store Results in CSV
+## Store Results in Dictionary
 results = {
     "Training Accuracy": train_accuracy,
     "Training Error": train_error,
     "Validation Accuracy": val_accuracy,
     "Validation Error": val_error,
-    "X.var()": x_train_gabor_feats.var()
+    "Number of PCA Components": pca.n_components_
 }
 
-pd.DataFrame([results]).to_csv("1j_gabor_pca_validation_results_filters=75.csv", index=False)
+### Using above dictionary, create a pandas dataframe and write results to csv
+pd.DataFrame([results]).to_csv("1j_gabor_results_filters=75.csv", index=False)
