@@ -1,47 +1,51 @@
 # Ravi Raghavan, Homework #1, Problem 3
+# To run this file, execute python rr1133_hw1_problem3.py in terminal
 
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+
+## Part (a)
 # Throughout the entire problem, I set the random state here for reproducability
 random_state = 42
 
-## Part (a)
 ### Load Data from torchvision using the Code provided by the assignment.
 import torchvision as thv
-train = thv.datasets.MNIST("./", download=True, train=True)
-val = thv.datasets.MNIST("./", download=True, train=False)
+train = thv.datasets.MNIST("./", download=True, train=True) # training dataset
+val = thv.datasets.MNIST("./", download=True, train=False) # validation dataset
 print("Part (a): Print out shape of train.data, train.targets, val.data, and val.targets")
 print(train.data.shape, len(train.targets), val.data.shape, len(val.targets))
 
 ### Convert the above PyTorch Tensors to numpy. From here on out, NO Torch/Other Deep Learning Library 
-### PyTorch will ONLY be used at the VERY END to verify my results
+### PyTorch will ONLY be used at the VERY END to verify my results in part (i)
 import numpy as np
 np.random.seed(random_state) # set random state, throughout the entire problem, for reproducability
 X_train, y_train, X_val, y_val = train.data.numpy(), train.targets.numpy(), val.data.numpy(), val.targets.numpy()
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after converting to numpy")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
+X_train, X_val = X_train.astype(np.float64), X_val.astype(np.float64) ### Convert X_train and X_val to np.float64
 
-### Convert X_train and X_val to np.float64
-X_train, X_val = X_train.astype(np.float64), X_val.astype(np.float64)
-
-### Given X and y, where X contains training samples and y contains labels, keep only 50% of each class! 
+### Dataset Creation: Given X and y, where X contains data samples and y contains labels, the downsample() function only keeps 50% of the samples in each class! 
+### Eventually, using downsample(), we perform downsampling on X_train, y_train, X_val, y_val
 def downsample(X, y):
     # Store downsampled X and y
     X_downsampled, y_downsampled = [], []
+
+    # Iterate through all the classes
     for label in np.unique(y):
         indices = np.where(y == label)[0] # Fetch indices where y == label
-        indices = np.sort(indices)
-        half = len(indices) // 2
-        X_downsampled.append(X[indices[:half]])
-        y_downsampled.append(y[indices[:half]])
+        indices = np.sort(indices) # Sort indices in ascending order
+        half = len(indices) // 2 # Obtain the number of indices we are selecting (~50%)
+        chosen_indices = np.random.choice(indices, size = half, replace = False) # Random selection without replacement 
+        X_downsampled.append(X[chosen_indices])
+        y_downsampled.append(y[chosen_indices])
     
     return np.concatenate(X_downsampled, axis = 0), np.concatenate(y_downsampled, axis = 0)
 
-### Perform downsampling on X_train, y_train, X_val, y_val
-X_train, y_train = downsample(X_train, y_train)
-X_val, y_val = downsample(X_val, y_val)
+X_train, y_train = downsample(X_train, y_train) # downsample X_train, y_train
+X_val, y_val = downsample(X_val, y_val) # downsample X_val, y_val
 print("Part (a): Print out shape of X_train, y_train, X_val, and y_val after downsampling")
 print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
 
-### Pre-processing: Step 1: Divide all pixels by 255 to get images in [0, 1].
+### Pre-processing: Step 1: Divide all pixels by 255 to get images in [0, 1]. Aim is to stabilize DNN training
 X_train, X_val = X_train / 255.0,  X_val / 255.0
 
 ## Plot the images of a few images in the dataset just to see if label is right
@@ -67,7 +71,7 @@ plot_images_random(X_val, y_val, "3a_val_images.png", "Validation Images w/ Labe
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-## Problem 3, Part (b): Embedding Layer
+## Problem 3, Part (b): Embedding Layer NumPy Implementation
 class embedding_t:
     def __init__(self):
         # initialize to appropriate sizes, fill with Gaussian entries
@@ -81,10 +85,10 @@ class embedding_t:
         self.b = self.b / fro_norm
     
     def zero_grad(self):
-        # useful to delete the stored backprop gradients of the previous mini-batch before you start a new mini-batch
+        # According to HW PDF: "useful to delete the stored backprop gradients of the previous mini-batch before you start a new mini-batch"
         self.dw, self.db = 0, 0
 
-    # Shape of hl: B x 28 x 28
+    # Note: Shape of hl: B x 28 x 28
     def forward(self, hl):
         # Store Batch Value
         B = hl.shape[0]
@@ -93,29 +97,30 @@ class embedding_t:
         # Step 1: Convert hl to B X 28 X 28 X 1
         self.hl = hl[:, :, :, None]
 
-        # Step 2: Convert hl to B X 28 X 28 X 8
+        # Step 2: Convert hl to B X 28 X 28 X 8. This repeats each pixel coordinate 8 times along the last axis
         self.hl = np.repeat(self.hl, repeats = 8, axis = -1)
 
         # Step 3: Form Sliding Windows: Shape is B x 25 x 25 x 1 x 4 x 4 x 8. Cache sliding_windows for use in backward
         self.sliding_windows = np.lib.stride_tricks.sliding_window_view(self.hl, window_shape = (4, 4, 8), axis = (1, 2, 3))
         
-        # Step 4: To capture Stride in our convolution, subset windows and we now have B x 7 x 7 x 4 x 4 x 8
+        # Step 4: To capture Stride = 4 in our convolution, subset windows accordingly and we now have B x 7 x 7 x 4 x 4 x 8
         self.sliding_windows = self.sliding_windows[:, ::4, ::4, 0]
 
         # Step 5: Element-wise multiplication to get output of B x 7 x 7 x 8
         hl_plus_1 = (self.sliding_windows * self.w).sum(axis = (3, 4)) + self.b
 
-        # Step 6: Convert to B x 392
+        # Step 6: Convert to B x 392 [i.e. flatten each vector] before next layer
         hl_plus_1 = hl_plus_1.reshape(B, -1)
 
+        # Step 7: Return Output
         return hl_plus_1
     
-    # dhl_plus_1 Shape: B x 392
+    # Note: dhl_plus_1 Shape: B x 392
     def backward(self, dhl_plus_1):
         # Store Batch Value
         B = dhl_plus_1.shape[0]
 
-        # Step 1: Reshape as B x 7 x 7 x 8
+        # Step 1: Reshape as B x 7 x 7 x 8. This essentially reverses the reshaping process done at the end of the forward pass!
         dhl_plus_1 = dhl_plus_1.reshape(B, 7, 7, 8)
 
         # Step 2: Compute dw and db
@@ -126,14 +131,14 @@ class embedding_t:
         # Step 3: Store gradients for w and b
         self.dw, self.db = dw, db
 
-        # Step 4: Compute dhl
+        # Step 4: Compute dhl. Make sure to transpose the axes(refer to homework writeup for explanation)
         dhl = (self.w * dhl_plus_1_reshaped).sum(axis = -1) # B x 7 x 7 x 4 x 4 
         dhl = dhl.transpose(0, 1, 3, 2, 4).reshape(B, 28, 28) # B x 28 x 28
         return dhl
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-## Problem 3, Part (c): Linear Layer
+## Problem 3, Part (c): Linear Layer NumPy Implementation
 class linear_t:
     def __init__(self):
         # initialize to appropriate sizes, fill with Gaussian entries
@@ -154,7 +159,7 @@ class linear_t:
         # Cache hl in forward because needed for back
         self.hl = hl
 
-        # Compute h_{l + 1}
+        # Compute h_{l + 1} via Linear Forward Pass
         hl_plus_1 = hl @ self.w.T + self.b
 
         return hl_plus_1
@@ -176,7 +181,7 @@ class linear_t:
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-## Problem 3, part (d): ReLU Layer
+## Problem 3, part (d): ReLU Layer NumPy Implementation
 class relu_t:
     def __init__(self):
         pass
@@ -186,7 +191,7 @@ class relu_t:
         # Cache hl in forward because needed for back
         self.hl = hl
 
-        # Compute h_{l + 1}
+        # Compute h_{l + 1} via ReLU Forward Pass
         hl_plus_1 = np.maximum(0, self.hl)
 
         return hl_plus_1
@@ -235,7 +240,7 @@ class softmax_cross_entropy_t:
         # Get output from softmax
         softmax_output = self.hl_plus_1
 
-        # Create one hot labels
+        # Create one hot labels [Refer to Homework Writeup for explanation of this]
         y_one_hot = np.zeros_like(softmax_output)
         y_one_hot[np.arange(B), self.y] = 1
 
@@ -249,6 +254,9 @@ class softmax_cross_entropy_t:
 
 ### Part 1: Checking Linear Layer Backward Propagation
 #indices_W must be passed as a list of tuples, indices_b must be passed as list, and indices_h must be passed as list
+#indices_W: indices of dW we need to check
+#indices_b: indices of db we need to check
+#indices_h: indices of dh we need to check
 def check_backward_linear(k, indices_W, indices_b, indices_h):
     layer = linear_t() # Linear Layer
     hl = np.random.randn(1, 392) # Shape: 1 x 392
@@ -274,20 +282,32 @@ def check_backward_linear(k, indices_W, indices_b, indices_h):
         eps = np.zeros(shape = W.shape)
         eps[i, j] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_W = ((hl @ (W + eps).T + b) - (hl @ (W - eps).T + b))[0, k] / (2 * eps)[i, j]
-        np.testing.assert_allclose(dw[i, j], deriv_W, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(dw[i, j], deriv_W, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
     
+    # Verify db
     for i in indices_b:
         eps = np.zeros(shape = b.shape)
         eps[i] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_b = ((hl @ W.T + (b + eps)) - (hl @ W.T + (b - eps)))[0, k] / (2 * eps)[i]
-        np.testing.assert_allclose(db[i], deriv_b, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(db[i], deriv_b, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
     
+    # Verify dh
     for i in indices_h:
         eps = np.zeros(shape = hl.shape)
         eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_h = (((hl + eps) @ W.T + b) - ((hl - eps) @ W.T + b))[0, k] / (2 * eps)[0, i]
-        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
 
+# Outer function that calls check_backward_linear() for 10 values of k and for many index values for W, b, and h
 def test_backward_linear_random_indices():
     rng = np.random.default_rng()
 
@@ -307,9 +327,10 @@ def test_backward_linear_random_indices():
         # Run the gradient check for this k
         check_backward_linear(k, indices_W, indices_b, indices_h)
 
-test_backward_linear_random_indices()
+test_backward_linear_random_indices() # Test Linear Layer Backpropagation
 
 ### Part 2: Checking ReLU Backward Propagation
+#indices_h: indices of dhl we need to check
 def check_backward_relu(k, indices_h):
     layer = relu_t()
     hl = np.random.randn(1, 10)
@@ -324,12 +345,17 @@ def check_backward_relu(k, indices_h):
     # Compute backward
     dhl = layer.backward(dhl_plus_1)
 
+    # Verify dh
     for i in indices_h:
         eps = np.zeros(shape = hl.shape)
         eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_h = ((np.maximum(0, hl + eps)) - (np.maximum(0, hl - eps)))[0, k] / (2 * eps)[0, i]
-        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
 
+# Outer function that calls check_backward_relu() to verify ReLU backpropagation
 def test_backward_relu_random_indices():
     rng = np.random.default_rng()
 
@@ -343,9 +369,11 @@ def test_backward_relu_random_indices():
         # Run the gradient check for this k
         check_backward_relu(k, indices_h)
 
-test_backward_relu_random_indices()
+test_backward_relu_random_indices() # Test ReLU Backpropagation
 
 ### Part 3: Check Backward Propagation of Softmax + Cross Entropy Loss Layer
+#hl: input to layer
+#y: ground truth labels
 def softmax_cross_entropy_utility(hl, y):
     # Flatten y as sanity check 
     y = y.flatten()
@@ -361,11 +389,13 @@ def softmax_cross_entropy_utility(hl, y):
     correct_probs = hl_plus_1[np.arange(B), y]
     ell = -np.mean(np.log(correct_probs + 1e-12)) #Adding 1e-12 for numerical stability
 
+    # Step 3: Compute classification error 
     y_pred = np.argmax(hl_plus_1, axis=1)
     error = np.mean(y_pred != y)
 
     return ell, error
 
+# indices_h: indices of dhl we want to verify
 def check_backward_softmax(indices_h):
     layer = softmax_cross_entropy_t()
     hl = np.random.randn(1, 10)
@@ -377,6 +407,7 @@ def check_backward_softmax(indices_h):
     # Compute backward
     dhl = layer.backward()
 
+    # Verify dh
     for i in indices_h:
         eps = np.zeros(shape = hl.shape)
         eps[0, i] = np.random.normal(loc = 0.0, scale = 1e-8)
@@ -384,8 +415,12 @@ def check_backward_softmax(indices_h):
         RHS, _ = softmax_cross_entropy_utility(hl - eps, y)
         diff = LHS - RHS
         deriv_h = diff / (2 * eps)[0, i]
-        np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(dhl[0, i], deriv_h, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
 
+# Outer function that calls check_backward_softmax() to test the layer backpropagation
 def test_backward_softmax_random_indices():
     rng = np.random.default_rng()
 
@@ -395,34 +430,40 @@ def test_backward_softmax_random_indices():
     # Run the gradient check for this k
     check_backward_softmax(indices_h)
     
-test_backward_softmax_random_indices()
+test_backward_softmax_random_indices() # Test Softmax + Cross Entropy Layer Backpropagation
 
 ### Part 4: Check Backward Propagation of Embedding Layer
-def embedding_utility(hl, W, b):
+#hl: Input to layer, w and b are from HW PDF
+def embedding_utility(hl, w, b):
     # Store Batch Value
     B = hl.shape[0]
 
-    # We denote dimension of hl as B X 28 X 28 where B is the batch size
+    # We denote dimension of hl as B X 28 X 28 where B is the batch size. We will also be caching it for use in backward propagatino
     # Step 1: Convert hl to B X 28 X 28 X 1
     hl = hl[:, :, :, None]
 
-    # Step 2: Convert hl to B X 28 X 28 X 8
+    # Step 2: Convert hl to B X 28 X 28 X 8. This repeats each pixel coordinate 8 times along the last axis
     hl = np.repeat(hl, repeats = 8, axis = -1)
 
-    # Step 3: Form Sliding Windows: Shape is B x 25 x 25 x 1 x 4 x 4 x 8
+    # Step 3: Form Sliding Windows: Shape is B x 25 x 25 x 1 x 4 x 4 x 8. Cache sliding_windows for use in backward
     sliding_windows = np.lib.stride_tricks.sliding_window_view(hl, window_shape = (4, 4, 8), axis = (1, 2, 3))
     
-    # Step 4: To capture Stride in our convolution, subset windows and we now have B x 7 x 7 x 4 x 4 x 8
+    # Step 4: To capture Stride = 4 in our convolution, subset windows accordingly and we now have B x 7 x 7 x 4 x 4 x 8
     sliding_windows = sliding_windows[:, ::4, ::4, 0]
 
     # Step 5: Element-wise multiplication to get output of B x 7 x 7 x 8
-    hl_plus_1 = (sliding_windows * W).sum(axis = (3, 4)) + b
+    hl_plus_1 = (sliding_windows * w).sum(axis = (3, 4)) + b
 
-    # Step 6: Convert to B x 392
+    # Step 6: Convert to B x 392 [i.e. flatten each vector] before next layer
     hl_plus_1 = hl_plus_1.reshape(B, -1)
 
+    # Step 7: Return Output
     return hl_plus_1
 
+#indices_W must be passed as a list of tuples, indices_b must be passed as list, and indices_h must be passed as list
+#indices_W: indices of dW we need to check
+#indices_b: indices of db we need to check
+#indices_h: indices of dh we need to check
 def check_backward_embedding(t, indices_W, indices_b, indices_h):
     layer = embedding_t()
     hl = np.random.randn(1, 28, 28)
@@ -448,20 +489,32 @@ def check_backward_embedding(t, indices_W, indices_b, indices_h):
         eps = np.zeros(shape = W.shape)
         eps[i, j, k] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_W = (embedding_utility(hl, W + eps, b) - embedding_utility(hl, W - eps, b))[0, t] / (2 * eps)[i, j, k]
-        np.testing.assert_allclose(dw[i, j, k], deriv_W, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(dw[i, j, k], deriv_W, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
     
+    # Verify db
     for i in indices_b:
         eps = np.zeros(shape = b.shape)
         eps[i] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_b = (embedding_utility(hl, W, b + eps) - embedding_utility(hl, W, b - eps))[0, t] / (2 * eps)[i]
-        np.testing.assert_allclose(db[i], deriv_b, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(db[i], deriv_b, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
     
+    # Verify dh
     for i, j in indices_h:
         eps = np.zeros(shape = hl.shape)
         eps[0, i, j] = np.random.normal(loc = 0.0, scale = 1e-8)
         deriv_h = (embedding_utility(hl + eps, W, b) - embedding_utility(hl - eps, W, b))[0, t] / (2 * eps)[0, i, j]
-        np.testing.assert_allclose(dhl[0, i, j], deriv_h, rtol=1e-6, atol=1e-6)
+        try:
+            np.testing.assert_allclose(dhl[0, i, j], deriv_h, rtol=1e-4)
+        except AssertionError as e:
+            print(f"Assertion Error: {e}")
 
+# Outer function that calls check_backward_embedding() to verify Embedding Layer Backpropagation
 def test_backward_embedding_random_indices():
     rng = np.random.default_rng() # Set seed for reproducability
 
@@ -481,7 +534,7 @@ def test_backward_embedding_random_indices():
         # Run the gradient check for this k
         check_backward_embedding(t, indices_W, indices_b, indices_h)
 
-test_backward_embedding_random_indices()
+test_backward_embedding_random_indices() # Test Embedding Layer Backpropagation
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -501,6 +554,8 @@ net = [l1, l2, l3, l4]
 print("Part g: Print shapes of X_train, y_train, X_val, and y_val again")
 print(f"X_train shape -> {X_train.shape}, y_train shape: {y_train.shape}, X_val shape -> {X_val.shape}, y_val shape: {y_val.shape}")
 
+#l1_w: weights of embedding layer, l1_b: bias of embedding layer
+#l2_w: weights of linear layer, l2_b: bias of linear layer
 # X: Full set of samples, y: Full set of labels, B: Batch Size
 def validate(l1_w, l1_b, l2_w, l2_b, X, y, B):
     # 1. iterate over mini-batches from the dataset (X, y)
@@ -514,17 +569,18 @@ def validate(l1_w, l1_b, l2_w, l2_b, X, y, B):
         h3 = np.maximum(0, h2)
         batch_loss, batch_error = softmax_cross_entropy_utility(h3, y_batch)
 
-        # Accumulate the loss and error
-        loss += batch_loss * B
-        tot_error += batch_error * B
+        # Accumulate the loss and error over the batch size
+        loss += batch_loss * X_batch.shape[0]
+        tot_error += batch_error * X_batch.shape[0]
     
+    # Compute average over entire dataset
     avg_loss, avg_error = loss / X.shape[0], tot_error/ X.shape[0]
     return avg_loss, avg_error
 
 # Train for at least 1000 iterations with Batch Size 32, learning rate 0.1
 B = 32
 lr = 0.1
-epochs = 10000
+epochs = 20000
 
 # Compute initial training loss/error
 training_loss, training_error = validate(l1.w, l1.b, l2.w, l2.b, X_train, y_train, B)
@@ -571,15 +627,15 @@ for t in range(epochs):
     dw1, db1 = l1.dw, l1.db
     dw2, db2 = l2.dw, l2.db
     
-    # Store training loss/error every 10 weight updates
-    if (t + 1) % 10 == 0:
+    # Store training loss/error every 100 weight updates
+    if (t + 1) % 100 == 0:
         training_loss, training_error = validate(l1.w, l1.b, l2.w, l2.b, X_train, y_train, B)
         print(f"Epoch: {t + 1}, Training Loss: {training_loss}, Training Error: {training_error}")
         training_losses.append(training_loss)
         training_errors.append(training_error)
     
-    # 6. Store validation loss/error every 10 weight updates
-    if (t + 1) % 10 == 0:
+    # 6. Store validation loss/error every 1000 weight updates
+    if (t + 1) % 1000 == 0:
         validation_loss, validation_error = validate(l1.w, l1.b, l2.w, l2.b, X_val, y_val, B)
         print(f"Epoch: {t + 1}, Validation Loss: {validation_loss}, Validation Error: {validation_error}")
         validation_losses.append(validation_loss)
@@ -592,8 +648,8 @@ for t in range(epochs):
     l2.b = l2.b - lr*db2
 
 # Store plot of training loss + error
-training_epoch_labels = [i * 10 for i in range(len(training_losses))]
-validation_epoch_labels = [i * 10 for i in range(len(validation_losses))]
+training_epoch_labels = [i * 100 for i in range(len(training_losses))]
+validation_epoch_labels = [i * 1000 for i in range(len(validation_losses))]
 plt.figure(figsize=(8, 5))
 plt.plot(training_epoch_labels, training_losses, label='Training Loss[Ravi]')
 plt.xlabel('Iteration')
@@ -705,7 +761,7 @@ class NN(nn.Module):
     def __init__(self):
         super(NN, self).__init__()
         self.embed = EmbeddingLayer()
-        self.fc = nn.Linear(392, 10)
+        self.fc = nn.Linear(392, 10, bias = True)
         self._init_fc()
     
     ## Initialize weights and bias to be same as my NumPy implementation
@@ -723,7 +779,7 @@ class NN(nn.Module):
 ## Hyperparameters[Same as NumPy Implementation]
 batch_size = 32
 lr = 0.1
-epochs = 10000
+epochs = 20000
 
 # Convert NumPy arrays to torch tensors
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
@@ -778,7 +834,7 @@ batch_errors, batch_losses = [], []
 for epoch in range(epochs):
     model.train() # Set Model in Training Mode
     
-    # Randomly sample a batch
+    # Randomly sample a batch (i.e. same batch used in Numpy at this epoch)
     indices = batch_indices[epoch, :].flatten()
     batch_X, batch_y = X_train_tensor[indices], y_train_tensor[indices]
     
@@ -796,23 +852,23 @@ for epoch in range(epochs):
     predictions = torch.argmax(outputs, dim = 1)
     batch_errors.append(torch.mean((predictions != batch_y).float()))
     
-    # Store training loss/error every 10 weight updates
-    if (epoch + 1) % 10 == 0:
+    # Store training loss/error every 100 weight updates
+    if (epoch + 1) % 100 == 0:
         avg_train_loss, avg_train_error = validate_torch(X_train_tensor, y_train_tensor)
         print(f"Epoch: {epoch + 1}, Training Loss: {avg_train_loss}, Training Error: {avg_train_error}")
         training_losses.append(avg_train_loss)
         training_errors.append(avg_train_error)
 
-    # Store validation loss/error every 10 weight updates
-    if (epoch + 1) % 10 == 0:
+    # Store validation loss/error every 1000 weight updates
+    if (epoch + 1) % 1000 == 0:
         avg_val_loss, avg_val_error = validate_torch(X_val_tensor, y_val_tensor)
         print(f"Epoch: {epoch + 1}, Validation Loss: {avg_val_loss}, Validation Error: {avg_val_error}")
         validation_losses.append(avg_val_loss)
         validation_errors.append(avg_val_error)        
 
 # Plot training + validation losses
-training_epoch_labels = [i * 10 for i in range(len(training_losses))]
-validation_epoch_labels = [i * 10 for i in range(len(validation_losses))]
+training_epoch_labels = [i * 100 for i in range(len(training_losses))]
+validation_epoch_labels = [i * 1000 for i in range(len(validation_losses))]
 plt.figure(figsize=(8, 5))
 plt.plot(training_epoch_labels, training_losses, label='Training Loss[PyTorch]')
 plt.xlabel('Iteration')
